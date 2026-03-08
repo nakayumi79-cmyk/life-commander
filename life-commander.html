@@ -371,9 +371,9 @@ window._fsLoad = async function() {
 </div>
 
 <nav class="nav">
-  <button class="nav-btn active" onclick="showTab('warehouse',this)">📦 倉庫</button>
   <button class="nav-btn" onclick="showTab('today',this)">☀️ 今日のボード</button>
   <button class="nav-btn" onclick="showTab('schedule',this)">🗓️ 先の予定</button>
+  <button class="nav-btn active" onclick="showTab('warehouse',this)">📦 倉庫</button>
   <button class="nav-btn" onclick="showTab('diary',this)">📖 日記</button>
 </nav>
 
@@ -575,6 +575,7 @@ function mkTaskEl(task){
   div.className='task-item';div.draggable=true;div.dataset.id=task.id;
   div.addEventListener('dragstart',onDS);div.addEventListener('dragend',onDE);
   const p=task.parentId?getT(task.parentId):null;const k=kids(task.id);
+  const alreadyToday=task.todayDate===todayStr();
   div.innerHTML=`
     <span class="drag-handle">⠿</span>
     <div class="task-content">
@@ -587,6 +588,7 @@ function mkTaskEl(task){
       </div>
     </div>
     <div class="task-actions">
+      ${alreadyToday?'<span style="font-size:11px;color:var(--teal);font-weight:700;">✓今日</span>':`<button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${task.id}')" title="今日やるに追加">☀️</button>`}
       <button class="icon-btn edit" onclick="openAddChildModal('${task.id}')" title="子追加">＋</button>
       <button class="icon-btn edit" onclick="openEditModal('${task.id}')" title="編集">✎</button>
       <button class="icon-btn danger" onclick="delTask('${task.id}')" title="削除">✕</button>
@@ -651,13 +653,14 @@ function renderToday(){
         <div class="task-content">
           <div class="task-name" style="${hasK?'font-size:12px;color:var(--text2)':''}">${esc(task.name)}${hasK?' <span style="color:var(--text3);font-size:11px">（子タスクをドラッグ）</span>':''}</div>
           <div class="task-meta">${dlTag(task.deadline)}</div>
-        </div>`;
+        </div>
+        ${!hasK?`<div class="task-actions"><button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${task.id}')" title="今日やるに追加">☀️</button></div>`:''}`;
       src.appendChild(div);
       k.forEach(c=>{
         const cd=document.createElement('div');cd.className='task-item subtask-indent';
         cd.draggable=true;cd.dataset.id=c.id;
         cd.addEventListener('dragstart',onDS);cd.addEventListener('dragend',onDE);
-        cd.innerHTML=`<span class="drag-handle">⠿</span><div class="task-content"><div class="task-name" style="font-size:13px">${esc(c.name)}</div><div class="task-meta">${dlTag(c.deadline)}</div></div>`;
+        cd.innerHTML=`<span class="drag-handle">⠿</span><div class="task-content"><div class="task-name" style="font-size:13px">${esc(c.name)}</div><div class="task-meta">${dlTag(c.deadline)}</div></div><div class="task-actions"><button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${c.id}')" title="今日やるに追加">☀️</button></div>`;
         src.appendChild(cd);
       });
     });
@@ -922,6 +925,7 @@ function openSchedAdd(date){smEditId=null;document.getElementById('schedModalTit
 function openSchedEdit(id){const t=getT(id);if(!t)return;smEditId=id;document.getElementById('schedModalTitle').textContent='✏️ 予定を編集';document.getElementById('smName').value=t.name;document.getElementById('smDate').value=t.scheduledDate||'';document.getElementById('smDl').value=t.deadline||'';document.getElementById('smMemo').value=t.memo||'';document.getElementById('schedModal').classList.add('open');document.getElementById('smName').focus();}
 function saveSchedModal(){const name=document.getElementById('smName').value.trim();if(!name)return;const date=document.getElementById('smDate').value;const deadline=document.getElementById('smDl').value||null;const memo=document.getElementById('smMemo').value.trim();if(smEditId){const t=getT(smEditId);if(t){t.name=name;t.scheduledDate=date;t.deadline=deadline;t.memo=memo;}}else{S.tasks.push({id:genId(),name,memo,deadline,parentId:null,scheduledDate:date,status:'todo',todayDate:null,completedDate:null});}saveState();closeModal('schedModal');renderAll();}
 
+function addToToday(id){const t=getT(id);if(!t)return;t.todayDate=todayStr();t.status='doing';t.completedDate=null;saveState();renderToday();}
 function quickAdd(){const inp=document.getElementById('whInput');const name=inp.value.trim();if(!name)return;S.tasks.push({id:genId(),name,memo:'',deadline:null,parentId:null,scheduledDate:null,status:'todo',todayDate:null,completedDate:null});inp.value='';saveState();renderWH();}
 function delTask(id){if(!confirm('削除しますか？'))return;S.tasks=S.tasks.filter(t=>t.id!==id&&t.parentId!==id);saveState();renderAll();}
 
