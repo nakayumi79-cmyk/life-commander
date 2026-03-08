@@ -149,7 +149,7 @@
 
   .drag-handle{color:var(--text3);font-size:14px;flex-shrink:0;margin-top:2px;user-select:none;}
   .task-content{flex:1;min-width:0;}
-  .task-name{font-size:19px;color:var(--text);line-height:1.5;word-break:break-all;}
+  .task-name{font-size:19px;color:var(--text);line-height:1.5;word-break:break-word;overflow-wrap:break-word;}
   @media(max-width:768px){.task-name{font-size:15px;}}
   .task-meta{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;}
 
@@ -162,6 +162,7 @@
 
   .task-actions{display:flex;gap:4px;opacity:0;transition:opacity 0.15s;flex-shrink:0;}
   .task-item:hover .task-actions{opacity:1;}
+  @media(max-width:768px){.task-actions{opacity:1;}}
 
   /* ===== CHECK CIRCLE ===== */
   .check-circle{width:20px;height:20px;border-radius:50%;border:2.5px solid var(--border);flex-shrink:0;cursor:pointer;transition:all 0.15s;margin-top:1px;display:flex;align-items:center;justify-content:center;}
