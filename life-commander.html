@@ -39,9 +39,9 @@
     .task-actions{opacity:1;}
   }
   @media(max-width:768px){
-    .wh-layout,.today-layout,.diary-layout{grid-template-columns:1fr;}
-    .board-cols{grid-template-columns:1fr;}
-    .task-actions{opacity:1;}
+    .today-layout{display:flex;flex-direction:column;}
+    .today-layout .board-cols{order:1;}
+    .today-layout .panel{order:2;}
   }
 
   /* ===== HEADER ===== */
@@ -625,6 +625,14 @@ function mkTreeEl(task){
 
 // ===== TODAY =====
 function renderToday(){
+  // 先の予定で今日の日付になったタスクを自動で「今日やる」に移動
+  let changed=false;
+  S.tasks.forEach(t=>{
+    if(t.scheduledDate===todayStr()&&t.todayDate!==todayStr()&&t.status!=='done'&&!t.isRoutine){
+      t.todayDate=todayStr();t.status='doing';changed=true;
+    }
+  });
+  if(changed)saveState();
   const src=document.getElementById('todaySrc');src.innerHTML='';
   const notTd=S.tasks.filter(t=>!t.parentId&&!t.scheduledDate&&t.todayDate!==todayStr()&&!t.isRoutine);
   const schedTd=S.tasks.filter(t=>t.scheduledDate===todayStr()&&t.todayDate!==todayStr());
