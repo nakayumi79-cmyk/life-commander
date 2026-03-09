@@ -521,7 +521,11 @@ window._fsLoad = async function() {
 </div>
 
 <script>
-const TODAY=new Date();TODAY.setHours(0,0,0,0);
+// 3時基準で「今日」を判定
+const _now=new Date();
+const TODAY=new Date(_now);
+if(_now.getHours()<3){TODAY.setDate(TODAY.getDate()-1);}
+TODAY.setHours(0,0,0,0);
 const DAYS=['日','月','火','水','木','金','土'];
 function toStr(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
 function todayStr(){return toStr(TODAY);}
@@ -787,7 +791,7 @@ let schedDragId=null;
 
 function renderSchedule(){
   const panel=document.getElementById('schedPanel');panel.innerHTML='';
-  for(let i=0;i<7;i++){
+  for(let i=1;i<=7;i++){
     const d=new Date(TODAY);d.setDate(d.getDate()+i);const s=toStr(d);
     const tasks=S.tasks.filter(t=>t.scheduledDate===s);const isT=i===0;
     const dd=document.createElement('div');dd.className='sched-day';dd.dataset.date=s;
