@@ -651,6 +651,12 @@ function renderToday(){
       t.todayDate=todayStr();t.status='doing';changed=true;
     }
   });
+  // directTaskは日付をまたいでも今日やるに持ち越す
+  S.tasks.forEach(t=>{
+    if(t.directTask&&t.status!=='done'&&t.todayDate&&t.todayDate!==todayStr()){
+      t.todayDate=todayStr();changed=true;
+    }
+  });
   if(changed)saveState();
   const src=document.getElementById('todaySrc');src.innerHTML='';
   const notTd=S.tasks.filter(t=>!t.parentId&&!t.scheduledDate&&t.todayDate!==todayStr()&&!t.isRoutine);
@@ -728,7 +734,7 @@ function addRoutine(){
 function addDirectTask(){
   const inp=document.getElementById('doingInput');
   const name=inp.value.trim();if(!name)return;
-  S.tasks.push({id:genId(),name,memo:'',deadline:null,parentId:null,scheduledDate:null,status:'doing',todayDate:todayStr(),completedDate:null});
+  S.tasks.push({id:genId(),name,memo:'',deadline:null,parentId:null,scheduledDate:null,status:'doing',todayDate:todayStr(),completedDate:null,directTask:true});
   inp.value='';saveState();renderToday();
 }
 
