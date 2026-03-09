@@ -796,21 +796,39 @@ function renderSchedule(){
     hdr.innerHTML=`<span class="sched-day-label ${isT?'today-lbl':''}">${dayLabel(s)}</span><span class="sched-cnt">${tasks.length}件</span>`;
     hdr.onclick=()=>toggleSD(hdr);
 
-    const body=document.createElement('div');body.className='sched-day-body';
-    body.addEventListener('dragover',e=>{e.preventDefault();body.style.background='rgba(248,181,0,0.08)';});
-    body.addEventListener('dragleave',()=>{body.style.background='';});
+    const body=document.createElement('div');body.className='sched-day-body';body.dataset.date=s;
+
+    // PC drag: dragover で並び替えプレビュー
+    body.addEventListener('dragover',e=>{
+      e.preventDefault();body.style.background='rgba(64,224,208,0.10)';
+      if(!schedDragId)return;
+      const after=getDragAfterElement(body,e.clientY);
+      const draggingEl=body.querySelector('.task-item.dragging');
+      // 別日からのドラッグ中は視覚フィードバックのみ
+      if(!draggingEl)return;
+      if(after)body.insertBefore(draggingEl,after);
+      else{const btn=body.querySelector('.add-btn');if(btn)body.insertBefore(draggingEl,btn);else body.appendChild(draggingEl);}
+    });
+    body.addEventListener('dragleave',e=>{if(!body.contains(e.relatedTarget))body.style.background='';});
     body.addEventListener('drop',e=>{
       e.preventDefault();body.style.background='';
       if(!schedDragId)return;
-      const t=getT(schedDragId);if(!t)return;
-      t.scheduledDate=s;
-      saveState();renderSchedule();schedDragId=null;
+      const task=getT(schedDragId);if(!task)return;
+      // 日付を変更
+      task.scheduledDate=s;
+      // 現在のDOM順序で配列を並び替え
+      const ids=[...body.querySelectorAll('.task-item[data-id]')].map(el=>el.dataset.id);
+      ids.forEach(id=>{const t=getT(id);if(t)t.scheduledDate=s;});
+      const others=S.tasks.filter(t=>!ids.includes(t.id));
+      const ordered=ids.map(id=>getT(id)).filter(Boolean);
+      S.tasks=[...others,...ordered];
+      saveState();renderSchedule();renderSchedSrc();schedDragId=null;
     });
 
     tasks.forEach(t=>{
       const item=document.createElement('div');
       item.className='task-item';item.draggable=true;item.dataset.id=t.id;
-      item.style.marginBottom='6px';
+      item.style.cssText='margin-bottom:6px;touch-action:none;user-select:none;-webkit-user-select:none;';
       item.innerHTML=`
         <span class="drag-handle">⠿</span>
         <div class="task-content">
@@ -821,8 +839,61 @@ function renderSchedule(){
           <button class="icon-btn edit" onclick="openSchedEdit('${t.id}')">✎</button>
           <button class="icon-btn danger" onclick="delTask('${t.id}')">✕</button>
         </div>`;
-      item.addEventListener('dragstart',e=>{schedDragId=t.id;item.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
-      item.addEventListener('dragend',()=>item.classList.remove('dragging'));
+
+      // PC drag
+      item.addEventListener('dragstart',e=>{
+        schedDragId=t.id;item.classList.add('dragging');e.dataTransfer.effectAllowed='move';
+      });
+      item.addEventListener('dragend',()=>{item.classList.remove('dragging');panel.querySelectorAll('.sched-day-body').forEach(b=>b.style.background='');});
+
+      // iOS touch drag
+      let touchClone=null,touchScrollY=0;
+      item.addEventListener('touchstart',e=>{
+        schedDragId=t.id;touchScrollY=window.scrollY;
+        item.style.opacity='0.4';
+      },{passive:true});
+      item.addEventListener('touchmove',e=>{
+        e.preventDefault();
+        const touch=e.touches[0];
+        // ターゲットのbodyを探してハイライト
+        panel.querySelectorAll('.sched-day-body').forEach(b=>b.style.background='');
+        const el=document.elementFromPoint(touch.clientX,touch.clientY);
+        const targetBody=el&&el.closest('.sched-day-body');
+        if(targetBody){
+          targetBody.style.background='rgba(64,224,208,0.12)';
+          // 同じ日の場合は並び替えプレビュー
+          if(targetBody===body){
+            const after=getDragAfterElement(body,touch.clientY);
+            const btn=body.querySelector('.add-btn');
+            if(after)body.insertBefore(item,after);
+            else if(btn)body.insertBefore(item,btn);
+            else body.appendChild(item);
+          }
+        }
+      },{passive:false});
+      item.addEventListener('touchend',e=>{
+        item.style.opacity='';
+        panel.querySelectorAll('.sched-day-body').forEach(b=>b.style.background='');
+        const touch=e.changedTouches[0];
+        const el=document.elementFromPoint(touch.clientX,touch.clientY);
+        const targetBody=el&&el.closest('.sched-day-body');
+        if(targetBody){
+          const targetDate=targetBody.closest('.sched-day').dataset.date;
+          const task=getT(schedDragId);
+          if(task){
+            task.scheduledDate=targetDate;
+            // DOM順で配列を並び替え
+            const ids=[...targetBody.querySelectorAll('.task-item[data-id]')].map(el=>el.dataset.id);
+            ids.forEach(id=>{const tt=getT(id);if(tt)tt.scheduledDate=targetDate;});
+            const others=S.tasks.filter(tt=>!ids.includes(tt.id));
+            const ordered=ids.map(id=>getT(id)).filter(Boolean);
+            S.tasks=[...others,...ordered];
+            saveState();renderSchedule();renderSchedSrc();
+          }
+        }
+        schedDragId=null;
+      },{passive:true});
+
       body.appendChild(item);
     });
 
@@ -842,27 +913,47 @@ function renderSchedSrc(){
   if(tasks.length===0){list.innerHTML='<div class="empty-state">倉庫は空です ✨</div>';return;}
   tasks.forEach(t=>{
     const div=document.createElement('div');div.className='task-item';div.draggable=true;div.dataset.id=t.id;
+    div.style.cssText='touch-action:none;user-select:none;-webkit-user-select:none;';
     div.innerHTML=`
       <span class="drag-handle" style="color:#b07800;font-size:16px;">⠿</span>
       <div class="task-content">
         <div class="task-name">${esc(t.name)}</div>
         <div class="task-meta">${dlTag(t.deadline)}</div>
       </div>`;
+
+    // PC drag
     div.addEventListener('dragstart',e=>{schedDragId=t.id;div.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
-    div.addEventListener('dragend',()=>div.classList.remove('dragging'));
+    div.addEventListener('dragend',()=>{div.classList.remove('dragging');});
+
     // iOS touch drag
-    div.addEventListener('touchstart',e=>{schedDragId=t.id;div.classList.add('dragging');},{passive:true});
+    div.addEventListener('touchstart',e=>{schedDragId=t.id;div.style.opacity='0.4';},{passive:true});
+    div.addEventListener('touchmove',e=>{
+      e.preventDefault();
+      const touch=e.touches[0];
+      const panel=document.getElementById('schedPanel');
+      panel.querySelectorAll('.sched-day-body').forEach(b=>b.style.background='');
+      const el=document.elementFromPoint(touch.clientX,touch.clientY);
+      const targetBody=el&&el.closest('.sched-day-body');
+      if(targetBody)targetBody.style.background='rgba(64,224,208,0.12)';
+    },{passive:false});
     div.addEventListener('touchend',e=>{
-      div.classList.remove('dragging');
+      div.style.opacity='';
+      const panel=document.getElementById('schedPanel');
+      panel.querySelectorAll('.sched-day-body').forEach(b=>b.style.background='');
       const touch=e.changedTouches[0];
       const el=document.elementFromPoint(touch.clientX,touch.clientY);
-      const body=el&&el.closest('.sched-day-body');
-      if(body){
-        const date=body.closest('.sched-day').dataset.date;
-        const task=getT(schedDragId);if(task){task.scheduledDate=date;saveState();renderSchedule();renderSchedSrc();}
+      const targetBody=el&&el.closest('.sched-day-body');
+      if(targetBody){
+        const date=targetBody.closest('.sched-day').dataset.date;
+        const task=getT(schedDragId);
+        if(task){
+          task.scheduledDate=date;
+          saveState();renderSchedule();renderSchedSrc();
+        }
       }
       schedDragId=null;
     },{passive:true});
+
     list.appendChild(div);
   });
 }
