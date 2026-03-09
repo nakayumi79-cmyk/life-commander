@@ -152,7 +152,8 @@
     background:var(--bg);
     transition:all 0.15s;
   }
-  .task-item[draggable="true"]{cursor:grab;}
+  .task-item[draggable="true"]{cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;}
+  .drag-handle{touch-action:none;user-select:none;-webkit-user-select:none;}
   .task-item[draggable="true"]:hover{border-color:var(--yellow);background:rgba(248,181,0,0.05);box-shadow:0 2px 8px rgba(248,181,0,0.15);}
   .task-item.dragging{opacity:0.35;cursor:grabbing;}
   .task-item.completed .task-name{text-decoration:line-through;color:var(--text3);}
@@ -447,9 +448,17 @@ window._fsLoad = async function() {
 
 <!-- 先の予定 -->
 <div class="main" id="tab-schedule">
-  <div style="max-width:700px">
-    <h2 style="font-size:18px;color:var(--teal);font-weight:700;margin-bottom:18px;letter-spacing:0.05em;">🗓️ 今後7日間の予定</h2>
-    <div class="panel teal" id="schedPanel"></div>
+  <div class="today-layout">
+    <div class="panel yellow" style="border:2px solid rgba(248,181,0,0.4);background:rgba(248,181,0,0.04);">
+      <div class="panel-header" style="background:linear-gradient(135deg,rgba(248,181,0,0.15),rgba(248,181,0,0.03));border-bottom:2px solid rgba(248,181,0,0.25);border-top:4px solid var(--yellow);">
+        <span class="panel-title" style="color:#b07800;">📦 倉庫から選ぶ</span>
+      </div>
+      <div class="task-list" id="schedSrc" style="max-height:600px"></div>
+    </div>
+    <div>
+      <h2 style="font-size:18px;color:var(--teal);font-weight:700;margin-bottom:18px;letter-spacing:0.05em;">🗓️ 今後7日間の予定</h2>
+      <div class="panel teal" id="schedPanel"></div>
+    </div>
   </div>
 </div>
 
@@ -736,7 +745,27 @@ function renderCol(colId,tasks){
   }
   tasks.forEach(t=>{
     const div=document.createElement('div');div.className='task-item'+(isDone?' completed':'');
-    if(!isDone){div.draggable=true;div.dataset.id=t.id;div.addEventListener('dragstart',onDS);div.addEventListener('dragend',onDE);}
+    if(!isDone){
+      div.draggable=true;div.dataset.id=t.id;
+      div.addEventListener('dragstart',onDS);div.addEventListener('dragend',onDE);
+      // iOS touch drag for reorder within col
+      div.addEventListener('touchstart',e=>{dragId=t.id;dragSrcList=el;div.classList.add('dragging');},{passive:true});
+      div.addEventListener('touchmove',e=>{
+        e.preventDefault();
+        const touch=e.touches[0];
+        const after=getDragAfterElement(el,touch.clientY);
+        if(after)el.insertBefore(div,after);else el.appendChild(div);
+      },{passive:false});
+      div.addEventListener('touchend',e=>{
+        div.classList.remove('dragging');
+        // persist new order
+        const newOrder=[...el.querySelectorAll('.task-item[data-id]')].map(x=>x.dataset.id);
+        const colTasks=newOrder.map(id=>getT(id)).filter(Boolean);
+        const others=S.tasks.filter(x=>!newOrder.includes(x.id));
+        S.tasks=[...others,...colTasks];
+        saveState();dragId=null;
+      },{passive:true});
+    }
     div.innerHTML=`
       <div class="check-circle ${isDone?'on':''}" onclick="toggleDone('${t.id}')"></div>
       <div class="task-content">
@@ -805,6 +834,38 @@ function renderSchedule(){
   }
 }
 function toggleSD(hdr){const b=hdr.nextElementSibling;b.style.display=b.style.display==='none'?'':'none';}
+
+function renderSchedSrc(){
+  const list=document.getElementById('schedSrc');if(!list)return;
+  const tasks=S.tasks.filter(t=>!t.parentId&&!t.scheduledDate&&!t.isRoutine&&t.status!=='done'&&(!t.todayDate||t.todayDate!==todayStr()));
+  list.innerHTML='';
+  if(tasks.length===0){list.innerHTML='<div class="empty-state">倉庫は空です ✨</div>';return;}
+  tasks.forEach(t=>{
+    const div=document.createElement('div');div.className='task-item';div.draggable=true;div.dataset.id=t.id;
+    div.innerHTML=`
+      <span class="drag-handle" style="color:#b07800;font-size:16px;">⠿</span>
+      <div class="task-content">
+        <div class="task-name">${esc(t.name)}</div>
+        <div class="task-meta">${dlTag(t.deadline)}</div>
+      </div>`;
+    div.addEventListener('dragstart',e=>{schedDragId=t.id;div.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+    div.addEventListener('dragend',()=>div.classList.remove('dragging'));
+    // iOS touch drag
+    div.addEventListener('touchstart',e=>{schedDragId=t.id;div.classList.add('dragging');},{passive:true});
+    div.addEventListener('touchend',e=>{
+      div.classList.remove('dragging');
+      const touch=e.changedTouches[0];
+      const el=document.elementFromPoint(touch.clientX,touch.clientY);
+      const body=el&&el.closest('.sched-day-body');
+      if(body){
+        const date=body.closest('.sched-day').dataset.date;
+        const task=getT(schedDragId);if(task){task.scheduledDate=date;saveState();renderSchedule();renderSchedSrc();}
+      }
+      schedDragId=null;
+    },{passive:true});
+    list.appendChild(div);
+  });
+}
 
 // ===== DIARY =====
 let calY=TODAY.getFullYear(),calM=TODAY.getMonth(),selDate=todayStr();
@@ -961,11 +1022,11 @@ function showTab(name,btn){
   document.querySelectorAll('.nav-btn').forEach(el=>el.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');btn.classList.add('active');
   if(name==='today')renderToday();
-  else if(name==='schedule')renderSchedule();
+  else if(name==='schedule'){renderSchedule();renderSchedSrc();}
   else if(name==='diary'){renderCal();renderDiary();}
   else renderWH();
 }
-function renderAll(){renderWH();const a=document.querySelector('.main.active')?.id;if(a==='tab-today')renderToday();else if(a==='tab-schedule')renderSchedule();else if(a==='tab-diary'){renderCal();renderDiary();}}
+function renderAll(){renderWH();const a=document.querySelector('.main.active')?.id;if(a==='tab-today')renderToday();else if(a==='tab-schedule'){renderSchedule();renderSchedSrc();}else if(a==='tab-diary'){renderCal();renderDiary();}}
 
 function exportData(){
   const json=JSON.stringify(S,null,2);
