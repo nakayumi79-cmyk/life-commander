@@ -158,6 +158,15 @@
   .task-item.dragging{opacity:0.35;cursor:grabbing;}
   .task-item.completed .task-name{text-decoration:line-through;color:var(--text3);}
 
+  /* 倉庫トグル */
+  .wh-toggle{width:20px;flex-shrink:0;font-size:11px;color:var(--text3);cursor:pointer;padding:2px;border-radius:4px;transition:color 0.15s;}
+  .wh-toggle:hover{color:var(--yellow);}
+  .wh-toggle-leaf{cursor:default;}
+  .wh-parent{border-radius:10px;}
+  .wh-children{background:rgba(248,181,0,0.03);border-left:3px solid rgba(248,181,0,0.25);margin-left:12px;margin-bottom:6px;border-radius:0 0 8px 8px;padding:4px 0 0 0;}
+  .wh-child{background:transparent;border-color:transparent;margin-bottom:2px;}
+  .wh-child:hover{background:rgba(248,181,0,0.05);border-color:rgba(248,181,0,0.2);}
+
   .drag-handle{color:var(--text3);font-size:14px;flex-shrink:0;margin-top:2px;user-select:none;}
   .task-content{flex:1;min-width:0;}
   .task-name{font-size:19px;color:var(--text);line-height:1.5;word-break:break-word;overflow-wrap:break-word;}
@@ -191,7 +200,9 @@
   .wh-layout{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
 
   /* ===== TODAY ===== */
-  .today-layout{display:grid;grid-template-columns:280px 1fr;gap:20px;}
+  .today-layout{display:grid;grid-template-columns:280px 1fr;gap:20px;align-items:start;}
+  .today-layout>.panel{position:sticky;top:16px;}
+  .today-layout>.panel .task-list{max-height:calc(100vh - 180px);overflow-y:auto;}
   .board-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
 
   .board-col{background:var(--surface);border:2px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.05);}
@@ -384,22 +395,16 @@ window._fsLoad = async function() {
 
 <!-- 倉庫 -->
 <div class="main" id="tab-warehouse">
-  <div class="wh-layout">
-    <div class="panel yellow">
-      <div class="panel-header">
-        <span class="panel-title">📦 アイデア倉庫</span>
-        <button class="btn btn-ghost btn-sm" onclick="openAddModal()">＋ 詳細追加</button>
-      </div>
-      <div class="input-row">
-        <input class="inp" id="whInput" placeholder="タスク名を入力してEnter..." onkeydown="if(event.key==='Enter'&&!event.isComposing)quickAdd()">
-        <button class="btn btn-yellow" onclick="quickAdd()">追加</button>
-      </div>
-      <div class="task-list" id="whList" ondragover="onDragOver(event)" ondrop="onDropWH(event)"></div>
+  <div class="panel yellow" style="max-width:600px;margin:0 auto;">
+    <div class="panel-header">
+      <span class="panel-title">📦 アイデア倉庫</span>
+      <button class="btn btn-ghost btn-sm" onclick="openAddModal()">＋ 詳細追加</button>
     </div>
-    <div class="panel teal">
-      <div class="panel-header"><span class="panel-title">🔗 親子関係ビュー</span></div>
-      <div class="task-list" id="treeView"></div>
+    <div class="input-row">
+      <input class="inp" id="whInput" placeholder="タスク名を入力してEnter..." onkeydown="if(event.key==='Enter'&&!event.isComposing)quickAdd()">
+      <button class="btn btn-yellow" onclick="quickAdd()">追加</button>
     </div>
+    <div class="task-list" id="whList"></div>
   </div>
 </div>
 
@@ -453,7 +458,7 @@ window._fsLoad = async function() {
       <div class="panel-header" style="background:linear-gradient(135deg,rgba(248,181,0,0.15),rgba(248,181,0,0.03));border-bottom:2px solid rgba(248,181,0,0.25);border-top:4px solid var(--yellow);">
         <span class="panel-title" style="color:#b07800;">📦 倉庫から選ぶ</span>
       </div>
-      <div class="task-list" id="schedSrc" style="max-height:600px"></div>
+      <div class="task-list" id="schedSrc"></div>
     </div>
     <div>
       <h2 style="font-size:18px;color:var(--teal);font-weight:700;margin-bottom:18px;letter-spacing:0.05em;">🗓️ 今後7日間の予定</h2>
@@ -576,71 +581,72 @@ function dlTag(dl){
 
 // ===== WAREHOUSE =====
 function renderWH(){
-  const list=document.getElementById('whList'),tree=document.getElementById('treeView');
+  const list=document.getElementById('whList');
   const roots=S.tasks.filter(t=>!t.parentId&&!t.scheduledDate&&!t.isRoutine&&t.status!=='done'&&!t.directTask&&(!t.todayDate||t.todayDate!==todayStr()));
   list.innerHTML='';
-  if(roots.length===0){list.innerHTML='<div class="empty-state">アイデアをどんどん追加しましょう ✨<br>Enterキーでサクッと追加できます</div>';}
-  else roots.forEach(t=>list.appendChild(mkTaskEl(t)));
-  tree.innerHTML='';
-  const wk=roots.filter(t=>kids(t.id).length>0);
-  if(wk.length===0){tree.innerHTML='<div class="empty-state">親子関係のあるタスクが<br>ここに表示されます 🔗</div>';}
-  else wk.forEach(t=>tree.appendChild(mkTreeEl(t)));
-}
-
-function mkTaskEl(task){
-  const div=document.createElement('div');
-  div.className='task-item';div.draggable=true;div.dataset.id=task.id;
-  div.addEventListener('dragstart',onDS);div.addEventListener('dragend',onDE);
-  const p=task.parentId?getT(task.parentId):null;const k=kids(task.id);
-  const alreadyToday=task.todayDate===todayStr();
-  div.innerHTML=`
-    <span class="drag-handle">⠿</span>
-    <div class="task-content">
-      <div class="task-name">${esc(task.name)}</div>
-      <div class="task-meta">
-        ${dlTag(task.deadline)}
-        ${p?`<span class="tag ptag">↳ ${esc(p.name)}</span>`:''}
-        ${k.length>0?`<span class="tag misc">子 ${k.length}件</span>`:''}
-        ${task.memo?`<span class="tag misc">📝 ${esc(task.memo)}</span>`:''}
+  if(roots.length===0){list.innerHTML='<div class="empty-state">アイデアをどんどん追加しましょう ✨<br>Enterキーでサクッと追加できます</div>';return;}
+  roots.forEach(t=>{
+    const childList=kids(t.id);
+    const hasKids=childList.length>0;
+    const alreadyToday=t.todayDate===todayStr();
+    // 親 or 単独タスク行
+    const row=document.createElement('div');
+    row.className='task-item wh-parent';row.dataset.id=t.id;
+    row.innerHTML=`
+      <span class="wh-toggle ${hasKids?'':'wh-toggle-leaf'}" data-id="${t.id}">${hasKids?'▶':''}</span>
+      <div class="task-content">
+        <div class="task-name">${esc(t.name)}</div>
+        <div class="task-meta">${dlTag(t.deadline)}${t.memo?`<span class="tag misc">📝 ${esc(t.memo)}</span>`:''}</div>
       </div>
-    </div>
-    <div class="task-actions">
-      ${alreadyToday?'<span style="font-size:11px;color:var(--teal);font-weight:700;">✓今日</span>':`<button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${task.id}')" title="今日やるに追加">☀️</button>`}
-      <button class="icon-btn edit" onclick="openAddChildModal('${task.id}')" title="子追加">＋</button>
-      <button class="icon-btn edit" onclick="openEditModal('${task.id}')" title="編集">✎</button>
-      <button class="icon-btn danger" onclick="delTask('${task.id}')" title="削除">✕</button>
-    </div>`;
-  return div;
-}
-
-function mkTreeEl(task){
-  const wrap=document.createElement('div');const k=kids(task.id);
-  wrap.innerHTML=`
-    <div class="task-item" style="background:rgba(64,224,208,0.08);border-color:rgba(64,224,208,0.3);cursor:default">
-      <div class="task-content"><div class="task-name" style="font-weight:700;color:#158878">${esc(task.name)}</div></div>
       <div class="task-actions">
-        <button class="icon-btn edit" onclick="openAddChildModal('${task.id}')">＋</button>
-        <button class="icon-btn edit" onclick="openEditModal('${task.id}')">✎</button>
-      </div>
-    </div>
-    <div class="subtask-indent">
-      ${k.map(c=>`
-        <div class="task-item" draggable="true" data-id="${c.id}" style="margin-bottom:5px">
-          <span class="drag-handle">⠿</span>
+        ${alreadyToday?'<span style="font-size:11px;color:var(--teal);font-weight:700;">✓今日</span>':`<button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${t.id}')" title="今日やるに追加">☀️</button>`}
+        <button class="icon-btn edit" onclick="openAddChildModal('${t.id}')" title="子追加">＋</button>
+        <button class="icon-btn edit" onclick="openEditModal('${t.id}')" title="編集">✎</button>
+        <button class="icon-btn danger" onclick="delTask('${t.id}')" title="削除">✕</button>
+      </div>`;
+    list.appendChild(row);
+
+    if(hasKids){
+      // 子タスクブロック（初期は折りたたみ）
+      const childBlock=document.createElement('div');
+      childBlock.className='wh-children';childBlock.dataset.parent=t.id;childBlock.style.display='none';
+      childList.forEach(c=>{
+        const crow=document.createElement('div');
+        crow.className='task-item wh-child';crow.dataset.id=c.id;
+        const cAlreadyToday=c.todayDate===todayStr();
+        crow.innerHTML=`
+          <span style="width:18px;color:#ccc;font-size:12px;">└</span>
           <div class="task-content">
-            <div class="task-name" style="font-size:13px">${esc(c.name)}</div>
-            <div class="task-meta">${dlTag(c.deadline)}</div>
+            <div class="task-name" style="font-size:14px">${esc(c.name)}</div>
+            <div class="task-meta">${dlTag(c.deadline)}${c.memo?`<span class="tag misc">📝 ${esc(c.memo)}</span>`:''}</div>
           </div>
           <div class="task-actions">
-            <button class="icon-btn edit" onclick="openEditModal('${c.id}')">✎</button>
-            <button class="icon-btn danger" onclick="delTask('${c.id}')">✕</button>
-          </div>
-        </div>`).join('')}
-      <button class="add-btn" onclick="openAddChildModal('${task.id}')">＋ 子タスクを追加</button>
-    </div>`;
-  wrap.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',onDS);el.addEventListener('dragend',onDE);});
-  return wrap;
+            ${cAlreadyToday?'<span style="font-size:11px;color:var(--teal);font-weight:700;">✓今日</span>':`<button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${c.id}')" title="今日やるに追加">☀️</button>`}
+            <button class="icon-btn edit" onclick="openEditModal('${c.id}')" title="編集">✎</button>
+            <button class="icon-btn danger" onclick="delTask('${c.id}')" title="削除">✕</button>
+          </div>`;
+        childBlock.appendChild(crow);
+      });
+      // ＋子タスク追加ボタン
+      const addChild=document.createElement('button');
+      addChild.className='add-btn';addChild.style.cssText='margin:4px 0 6px 28px;font-size:12px;';
+      addChild.textContent='＋ 子タスクを追加';addChild.onclick=()=>openAddChildModal(t.id);
+      childBlock.appendChild(addChild);
+      list.appendChild(childBlock);
+
+      // トグルクリック
+      row.querySelector('.wh-toggle').addEventListener('click',e=>{
+        e.stopPropagation();
+        const isOpen=childBlock.style.display!=='none';
+        childBlock.style.display=isOpen?'none':'block';
+        e.currentTarget.textContent=isOpen?'▶':'▼';
+        row.style.borderBottomLeftRadius=isOpen?'10px':'4px';
+        row.style.borderBottomRightRadius=isOpen?'10px':'4px';
+      });
+    }
+  });
 }
+
 
 // ===== TODAY =====
 function renderToday(){
