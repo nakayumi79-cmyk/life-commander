@@ -496,7 +496,7 @@ window._fsLoad = async function() {
     <div class="fg"><label class="fl">タスク名 *</label><input class="inp" id="mName" placeholder="タスク名"></div>
     <div class="fg"><label class="fl">親タスク</label><select class="sel" id="mParent"></select></div>
     <div class="fg"><label class="fl">期限（任意）</label><input class="inp" type="date" id="mDl"></div>
-    <div class="fg"><label class="fl">メモ（任意）</label><input class="inp" id="mMemo" placeholder="メモ"></div>
+    <div class="fg"><label class="fl">メモ（任意）</label><textarea class="inp txa" id="mMemo" placeholder="メモ" rows="3"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('taskModal')">キャンセル</button>
       <button class="btn btn-yellow" onclick="saveTaskModal()">保存</button>
@@ -511,7 +511,7 @@ window._fsLoad = async function() {
     <div class="fg"><label class="fl">タスク名 *</label><input class="inp" id="smName" placeholder="例：夕飯：カレー"></div>
     <div class="fg"><label class="fl">日付 *</label><input class="inp" type="date" id="smDate"></div>
     <div class="fg"><label class="fl">期限（任意）</label><input class="inp" type="date" id="smDl"></div>
-    <div class="fg"><label class="fl">メモ（任意）</label><input class="inp" id="smMemo" placeholder="メモ"></div>
+    <div class="fg"><label class="fl">メモ（任意）</label><textarea class="inp txa" id="smMemo" placeholder="メモ" rows="3"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('schedModal')">キャンセル</button>
       <button class="btn btn-teal" onclick="saveSchedModal()">保存</button>
