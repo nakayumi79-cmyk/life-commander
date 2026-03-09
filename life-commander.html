@@ -184,6 +184,9 @@
   .task-item:hover .task-actions{opacity:1;}
   @media(max-width:768px){.task-actions{opacity:1;}}
 
+  .task-name-link{cursor:pointer;color:inherit;border-bottom:1.5px dashed rgba(64,224,208,0.7);padding-bottom:1px;transition:color 0.15s,border-color 0.15s;}
+  .task-name-link:hover{color:#158878;border-bottom-color:var(--teal);}
+
   /* ===== CHECK CIRCLE ===== */
   .check-circle{width:20px;height:20px;border-radius:50%;border:2.5px solid var(--border);flex-shrink:0;cursor:pointer;transition:all 0.15s;margin-top:1px;display:flex;align-items:center;justify-content:center;}
   .check-circle:hover{border-color:var(--teal);}
@@ -525,6 +528,7 @@ window._fsLoad = async function() {
     <div class="fg"><label class="fl">タスク名 *</label><input class="inp" id="mName" placeholder="タスク名"></div>
     <div class="fg"><label class="fl">親タスク</label><select class="sel" id="mParent"></select></div>
     <div class="fg"><label class="fl">期限（任意）</label><input class="inp" type="date" id="mDl"></div>
+    <div class="fg"><label class="fl">URL（任意）</label><input class="inp" id="mUrl" placeholder="https://..."></div>
     <div class="fg"><label class="fl">メモ（任意）</label><textarea class="inp txa" id="mMemo" placeholder="メモ" rows="3"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('taskModal')">キャンセル</button>
@@ -540,6 +544,7 @@ window._fsLoad = async function() {
     <div class="fg"><label class="fl">タスク名 *</label><input class="inp" id="smName" placeholder="例：夕飯：カレー"></div>
     <div class="fg"><label class="fl">日付 *</label><input class="inp" type="date" id="smDate"></div>
     <div class="fg"><label class="fl">期限（任意）</label><input class="inp" type="date" id="smDl"></div>
+    <div class="fg"><label class="fl">URL（任意）</label><input class="inp" id="smUrl" placeholder="https://..."></div>
     <div class="fg"><label class="fl">メモ（任意）</label><textarea class="inp txa" id="smMemo" placeholder="メモ" rows="3"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('schedModal')">キャンセル</button>
@@ -608,7 +613,17 @@ function dlTag(dl){
   return`<span class="${cls}">${lbl}</span>`;
 }
 
-// ===== MEMO TOOLTIP =====
+function taskNameHtml(task,opts={}){
+  const n=esc(task.name);
+  const prefix=opts.prefix||'';
+  const style=opts.style||'';
+  if(task.url){
+    return`<span class="task-name-link${style?' '+style:''}" onclick="event.stopPropagation();window.open('${esc(task.url)}','_blank')" title="${esc(task.url)}">${prefix}${n} <span style="font-size:11px;opacity:0.7">🔗</span></span>`;
+  }
+  return`<span class="task-name${style?' '+style:''}">${prefix}${n}</span>`;
+}
+
+
 const _memoTip=document.createElement('div');
 _memoTip.className='memo-tooltip';
 document.body.appendChild(_memoTip);
@@ -656,7 +671,7 @@ function renderWH(){
     row.innerHTML=`
       <span class="wh-toggle ${hasKids?'':'wh-toggle-leaf'}" data-id="${t.id}">${hasKids?'▶':''}</span>
       <div class="task-content">
-        <div class="task-name">${esc(t.name)}</div>
+        <div class="task-name">${taskNameHtml(t)}</div>
         <div class="task-meta">${dlTag(t.deadline)}${t.memo?`<span class="tag misc">📝 ${esc(t.memo)}</span>`:''}</div>
       </div>
       <div class="task-actions">
@@ -678,7 +693,7 @@ function renderWH(){
         crow.innerHTML=`
           <span style="width:18px;color:#ccc;font-size:12px;">└</span>
           <div class="task-content">
-            <div class="task-name" style="font-size:14px">${esc(c.name)}</div>
+            <div class="task-name" style="font-size:14px">${taskNameHtml(c)}</div>
             <div class="task-meta">${dlTag(c.deadline)}${c.memo?`<span class="tag misc">📝 ${esc(c.memo)}</span>`:''}</div>
           </div>
           <div class="task-actions">
@@ -741,7 +756,7 @@ function renderToday(){
       div.innerHTML=`
         <span class="drag-handle" style="${hasK?'opacity:0.2':''}">⠿</span>
         <div class="task-content">
-          <div class="task-name" style="${hasK?'font-size:12px;color:var(--text2)':''}">${esc(task.name)}${hasK?' <span style="color:var(--text3);font-size:11px">（子タスクをドラッグ）</span>':''}</div>
+          <div class="task-name" style="${hasK?'font-size:12px;color:var(--text2)':''}">${taskNameHtml(task)}${hasK?' <span style="color:var(--text3);font-size:11px">（子タスクをドラッグ）</span>':''}</div>
           <div class="task-meta">${dlTag(task.deadline)}</div>
         </div>
         ${!hasK?`<div class="task-actions"><button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${task.id}')" title="今日やるに追加">☀️</button></div>`:''}`;
@@ -751,7 +766,7 @@ function renderToday(){
         const cd=document.createElement('div');cd.className='task-item subtask-indent';
         cd.draggable=true;cd.dataset.id=c.id;
         cd.addEventListener('dragstart',onDS);cd.addEventListener('dragend',onDE);
-        cd.innerHTML=`<span class="drag-handle">⠿</span><div class="task-content"><div class="task-name" style="font-size:13px">${esc(c.name)}</div><div class="task-meta">${dlTag(c.deadline)}</div></div><div class="task-actions"><button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${c.id}')" title="今日やるに追加">☀️</button></div>`;
+        cd.innerHTML=`<span class="drag-handle">⠿</span><div class="task-content"><div class="task-name" style="font-size:13px">${taskNameHtml(c)}</div><div class="task-meta">${dlTag(c.deadline)}</div></div><div class="task-actions"><button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${c.id}')" title="今日やるに追加">☀️</button></div>`;
         if(c.memo)attachMemoTip(cd.querySelector('.task-content'),c.memo);
         src.appendChild(cd);
       });
@@ -779,7 +794,7 @@ function renderRoutineCol(routines){
     div.className='task-item'+(t.routineDoneToday===todayStr()?' completed':'');
     div.innerHTML=`
       <div class="check-circle ${t.routineDoneToday===todayStr()?'on':''}" onclick="toggleRoutine('${t.id}')"></div>
-      <div class="task-content"><div class="task-name">${esc(t.name)}</div></div>
+      <div class="task-content"><div class="task-name">${taskNameHtml(t)}</div></div>
       <div class="task-actions">
         <button class="icon-btn edit" onclick="openEditModal('${t.id}')" title="編集">✎</button>
         <button class="icon-btn danger" onclick="delTask('${t.id}')" title="削除">✕</button>
@@ -849,7 +864,7 @@ function renderCol(colId,tasks){
     div.innerHTML=`
       <div class="check-circle ${isDone?'on':''}" onclick="toggleDone('${t.id}')"></div>
       <div class="task-content">
-        <div class="task-name">${esc(t.name)}</div>
+        <div class="task-name">${taskNameHtml(t)}</div>
         <div class="task-meta">${dlTag(t.deadline)}</div>
       </div>
       <div class="task-actions">
@@ -914,7 +929,7 @@ function renderSchedule(){
       item.innerHTML=`
         <span class="drag-handle">⠿</span>
         <div class="task-content">
-          <div class="task-name">${esc(t.name)}</div>
+          <div class="task-name">${taskNameHtml(t)}</div>
           <div class="task-meta">${dlTag(t.deadline)}${t.memo?`<span class="tag misc">📝 ${esc(t.memo)}</span>`:''}</div>
         </div>
         <div class="task-actions">
@@ -1012,7 +1027,7 @@ function renderSchedSrc(){
     div.innerHTML=`
       <span class="drag-handle" style="color:#b07800;font-size:16px;">⠿</span>
       <div class="task-content">
-        <div class="task-name">${indent?'└ ':''}${esc(t.name)}</div>
+        <div class="task-name">${taskNameHtml(t,{prefix:indent?'└ ':''})}</div>
         <div class="task-meta">${dlTag(t.deadline)}</div>
       </div>`;
 
@@ -1186,17 +1201,17 @@ function initDeadlineInput(inputId){
 let mMode=null,mId=null;
 function autoResize(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
 function initTxa(id){const el=document.getElementById(id);if(!el)return;el.style.height='auto';el.style.height=Math.max(90,el.scrollHeight)+'px';el.oninput=()=>autoResize(el);}
-function openAddModal(){mMode='add';mId=null;document.getElementById('taskModalTitle').textContent='✨ タスクを追加';['mName','mMemo'].forEach(id=>document.getElementById(id).value='');document.getElementById('mDl').value='';popParent(null);document.getElementById('taskModal').classList.add('open');document.getElementById('mName').focus();initTxa('mMemo');}
-function openAddChildModal(pid){mMode='addChild';mId=pid;const p=getT(pid);document.getElementById('taskModalTitle').textContent=`「${p?.name}」に子タスクを追加`;['mName','mMemo'].forEach(id=>document.getElementById(id).value='');document.getElementById('mDl').value='';popParent(pid);document.getElementById('taskModal').classList.add('open');document.getElementById('mName').focus();initTxa('mMemo');}
-function openEditModal(id){const t=getT(id);if(!t)return;mMode='edit';mId=id;document.getElementById('taskModalTitle').textContent='✏️ タスクを編集';document.getElementById('mName').value=t.name;document.getElementById('mMemo').value=t.memo||'';document.getElementById('mDl').value=t.deadline||'';popParent(t.parentId||null);document.getElementById('taskModal').classList.add('open');document.getElementById('mName').focus();initTxa('mMemo');}
+function openAddModal(){mMode='add';mId=null;document.getElementById('taskModalTitle').textContent='✨ タスクを追加';['mName','mMemo','mUrl'].forEach(id=>document.getElementById(id).value='');document.getElementById('mDl').value='';popParent(null);document.getElementById('taskModal').classList.add('open');document.getElementById('mName').focus();initTxa('mMemo');}
+function openAddChildModal(pid){mMode='addChild';mId=pid;const p=getT(pid);document.getElementById('taskModalTitle').textContent=`「${p?.name}」に子タスクを追加`;['mName','mMemo','mUrl'].forEach(id=>document.getElementById(id).value='');document.getElementById('mDl').value='';popParent(pid);document.getElementById('taskModal').classList.add('open');document.getElementById('mName').focus();initTxa('mMemo');}
+function openEditModal(id){const t=getT(id);if(!t)return;mMode='edit';mId=id;document.getElementById('taskModalTitle').textContent='✏️ タスクを編集';document.getElementById('mName').value=t.name;document.getElementById('mMemo').value=t.memo||'';document.getElementById('mDl').value=t.deadline||'';document.getElementById('mUrl').value=t.url||'';popParent(t.parentId||null);document.getElementById('taskModal').classList.add('open');document.getElementById('mName').focus();initTxa('mMemo');}
 function popParent(selId){const sel=document.getElementById('mParent');sel.innerHTML='<option value="">なし（トップレベル）</option>';S.tasks.filter(t=>!t.parentId).forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=t.name;if(t.id===selId)o.selected=true;sel.appendChild(o);});}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
-function saveTaskModal(){const name=document.getElementById('mName').value.trim();if(!name)return;const memo=document.getElementById('mMemo').value.trim();const deadline=document.getElementById('mDl').value||null;const parentId=document.getElementById('mParent').value||null;if(mMode==='edit'&&mId){const t=getT(mId);if(t){t.name=name;t.memo=memo;t.deadline=deadline;t.parentId=parentId;}}else{S.tasks.push({id:genId(),name,memo,deadline,parentId,scheduledDate:null,status:'todo',todayDate:null,completedDate:null});}saveState();closeModal('taskModal');renderAll();}
+function saveTaskModal(){const name=document.getElementById('mName').value.trim();if(!name)return;const memo=document.getElementById('mMemo').value.trim();const deadline=document.getElementById('mDl').value||null;const url=document.getElementById('mUrl').value.trim()||null;const parentId=document.getElementById('mParent').value||null;if(mMode==='edit'&&mId){const t=getT(mId);if(t){t.name=name;t.memo=memo;t.deadline=deadline;t.url=url;t.parentId=parentId;}}else{S.tasks.push({id:genId(),name,memo,deadline,url,parentId,scheduledDate:null,status:'todo',todayDate:null,completedDate:null});}saveState();closeModal('taskModal');renderAll();}
 
 let smEditId=null;
-function openSchedAdd(date){smEditId=null;document.getElementById('schedModalTitle').textContent='🗓️ 予定を追加';['smName','smMemo'].forEach(id=>document.getElementById(id).value='');document.getElementById('smDate').value=date;document.getElementById('smDl').value='';document.getElementById('schedModal').classList.add('open');document.getElementById('smName').focus();initTxa('smMemo');}
-function openSchedEdit(id){const t=getT(id);if(!t)return;smEditId=id;document.getElementById('schedModalTitle').textContent='✏️ 予定を編集';document.getElementById('smName').value=t.name;document.getElementById('smDate').value=t.scheduledDate||'';document.getElementById('smDl').value=t.deadline||'';document.getElementById('smMemo').value=t.memo||'';document.getElementById('schedModal').classList.add('open');document.getElementById('smName').focus();initTxa('smMemo');}
-function saveSchedModal(){const name=document.getElementById('smName').value.trim();if(!name)return;const date=document.getElementById('smDate').value;const deadline=document.getElementById('smDl').value||null;const memo=document.getElementById('smMemo').value.trim();if(smEditId){const t=getT(smEditId);if(t){t.name=name;t.scheduledDate=date;t.deadline=deadline;t.memo=memo;}}else{S.tasks.push({id:genId(),name,memo,deadline,parentId:null,scheduledDate:date,status:'todo',todayDate:null,completedDate:null});}saveState();closeModal('schedModal');renderAll();}
+function openSchedAdd(date){smEditId=null;document.getElementById('schedModalTitle').textContent='🗓️ 予定を追加';['smName','smMemo','smUrl'].forEach(id=>document.getElementById(id).value='');document.getElementById('smDate').value=date;document.getElementById('smDl').value='';document.getElementById('schedModal').classList.add('open');document.getElementById('smName').focus();initTxa('smMemo');}
+function openSchedEdit(id){const t=getT(id);if(!t)return;smEditId=id;document.getElementById('schedModalTitle').textContent='✏️ 予定を編集';document.getElementById('smName').value=t.name;document.getElementById('smDate').value=t.scheduledDate||'';document.getElementById('smDl').value=t.deadline||'';document.getElementById('smMemo').value=t.memo||'';document.getElementById('smUrl').value=t.url||'';document.getElementById('schedModal').classList.add('open');document.getElementById('smName').focus();initTxa('smMemo');}
+function saveSchedModal(){const name=document.getElementById('smName').value.trim();if(!name)return;const date=document.getElementById('smDate').value;const deadline=document.getElementById('smDl').value||null;const memo=document.getElementById('smMemo').value.trim();const url=document.getElementById('smUrl').value.trim()||null;if(smEditId){const t=getT(smEditId);if(t){t.name=name;t.scheduledDate=date;t.deadline=deadline;t.memo=memo;t.url=url;}}else{S.tasks.push({id:genId(),name,memo,deadline,url,parentId:null,scheduledDate:date,status:'todo',todayDate:null,completedDate:null});}saveState();closeModal('schedModal');renderAll();}
 
 function addToToday(id){const t=getT(id);if(!t)return;t.todayDate=todayStr();t.status='doing';t.completedDate=null;saveState();renderToday();}
 function quickAdd(){const inp=document.getElementById('whInput');const name=inp.value.trim();if(!name)return;S.tasks.push({id:genId(),name,memo:'',deadline:null,parentId:null,scheduledDate:null,status:'todo',todayDate:null,completedDate:null});inp.value='';saveState();renderWH();}
