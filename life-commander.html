@@ -551,7 +551,7 @@ window._onFsLoaded = function(data){
 
 function genId(){return Date.now()+'_'+Math.random().toString(36).slice(2,6);}
 function getT(id){return S.tasks.find(t=>t.id===id);}
-function kids(id){return S.tasks.filter(t=>t.parentId===id);}
+function kids(id){return S.tasks.filter(t=>t.parentId===id&&t.status!=='done');}
 function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
 
 function checkAlerts(){
@@ -573,7 +573,7 @@ function dlTag(dl){
 // ===== WAREHOUSE =====
 function renderWH(){
   const list=document.getElementById('whList'),tree=document.getElementById('treeView');
-  const roots=S.tasks.filter(t=>!t.parentId&&!t.scheduledDate&&!t.isRoutine);
+  const roots=S.tasks.filter(t=>!t.parentId&&!t.scheduledDate&&!t.isRoutine&&t.status!=='done');
   list.innerHTML='';
   if(roots.length===0){list.innerHTML='<div class="empty-state">アイデアをどんどん追加しましょう ✨<br>Enterキーでサクッと追加できます</div>';}
   else roots.forEach(t=>list.appendChild(mkTaskEl(t)));
@@ -908,16 +908,28 @@ function toggleSD(hdr){const b=hdr.nextElementSibling;b.style.display=b.style.di
 
 function renderSchedSrc(){
   const list=document.getElementById('schedSrc');if(!list)return;
-  const tasks=S.tasks.filter(t=>!t.parentId&&!t.scheduledDate&&!t.isRoutine&&t.status!=='done'&&(!t.todayDate||t.todayDate!==todayStr()));
+  // 親タスク＋子タスク（scheduledDate/isRoutine/done/今日やる済み を除く）
+  const allAvail=S.tasks.filter(t=>!t.scheduledDate&&!t.isRoutine&&t.status!=='done'&&(!t.todayDate||t.todayDate!==todayStr()));
+  // 表示順: 親→直後に子
+  const roots=allAvail.filter(t=>!t.parentId);
+  const display=[];
+  roots.forEach(p=>{
+    display.push({t:p,indent:false});
+    allAvail.filter(c=>c.parentId===p.id).forEach(c=>display.push({t:c,indent:true}));
+  });
+  // 親なし孤立子（親が別状態の場合）も表示
+  allAvail.filter(t=>t.parentId&&!roots.find(r=>r.id===t.parentId)).forEach(c=>display.push({t:c,indent:false}));
+
   list.innerHTML='';
-  if(tasks.length===0){list.innerHTML='<div class="empty-state">倉庫は空です ✨</div>';return;}
-  tasks.forEach(t=>{
+  if(display.length===0){list.innerHTML='<div class="empty-state">倉庫は空です ✨</div>';return;}
+
+  display.forEach(({t,indent})=>{
     const div=document.createElement('div');div.className='task-item';div.draggable=true;div.dataset.id=t.id;
-    div.style.cssText='touch-action:none;user-select:none;-webkit-user-select:none;';
+    div.style.cssText=`touch-action:none;user-select:none;-webkit-user-select:none;${indent?'margin-left:18px;border-left:3px solid var(--yellow);':''}`;
     div.innerHTML=`
       <span class="drag-handle" style="color:#b07800;font-size:16px;">⠿</span>
       <div class="task-content">
-        <div class="task-name">${esc(t.name)}</div>
+        <div class="task-name">${indent?'└ ':''}${esc(t.name)}</div>
         <div class="task-meta">${dlTag(t.deadline)}</div>
       </div>`;
 
@@ -946,10 +958,7 @@ function renderSchedSrc(){
       if(targetBody){
         const date=targetBody.closest('.sched-day').dataset.date;
         const task=getT(schedDragId);
-        if(task){
-          task.scheduledDate=date;
-          saveState();renderSchedule();renderSchedSrc();
-        }
+        if(task){task.scheduledDate=date;saveState();renderSchedule();renderSchedSrc();}
       }
       schedDragId=null;
     },{passive:true});
@@ -1105,7 +1114,20 @@ function saveSchedModal(){const name=document.getElementById('smName').value.tri
 
 function addToToday(id){const t=getT(id);if(!t)return;t.todayDate=todayStr();t.status='doing';t.completedDate=null;saveState();renderToday();}
 function quickAdd(){const inp=document.getElementById('whInput');const name=inp.value.trim();if(!name)return;S.tasks.push({id:genId(),name,memo:'',deadline:null,parentId:null,scheduledDate:null,status:'todo',todayDate:null,completedDate:null});inp.value='';saveState();renderWH();}
-function delTask(id){if(!confirm('削除しますか？'))return;S.tasks=S.tasks.filter(t=>t.id!==id&&t.parentId!==id);saveState();renderAll();}
+function delTask(id){
+  const t=getT(id);if(!t)return;
+  if(t.scheduledDate){
+    t.scheduledDate=null;t.status='todo';
+    saveState();renderSchedule();renderSchedSrc();
+  } else if(t.todayDate){
+    t.todayDate=null;t.status='todo';t.completedDate=null;
+    saveState();renderToday();
+  } else {
+    if(!confirm('削除しますか？'))return;
+    S.tasks=S.tasks.filter(x=>x.id!==id&&x.parentId!==id);
+    saveState();renderAll();
+  }
+}
 
 // ===== TABS =====
 function showTab(name,btn){
