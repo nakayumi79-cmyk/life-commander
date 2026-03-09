@@ -672,7 +672,7 @@ function renderWH(){
       <span class="wh-toggle ${hasKids?'':'wh-toggle-leaf'}" data-id="${t.id}">${hasKids?'▶':''}</span>
       <div class="task-content">
         <div class="task-name">${taskNameHtml(t)}</div>
-        <div class="task-meta">${dlTag(t.deadline)}${t.memo?`<span class="tag misc">📝 ${esc(t.memo)}</span>`:''}</div>
+        <div class="task-meta">${dlTag(t.deadline)}</div>
       </div>
       <div class="task-actions">
         ${alreadyToday?'<span style="font-size:11px;color:var(--teal);font-weight:700;">✓今日</span>':`<button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${t.id}')" title="今日やるに追加">☀️</button>`}
@@ -681,6 +681,7 @@ function renderWH(){
         <button class="icon-btn danger" onclick="delTask('${t.id}')" title="削除">✕</button>
       </div>`;
     list.appendChild(row);
+    if(t.memo)attachMemoTip(row.querySelector('.task-content'),t.memo);
 
     if(hasKids){
       // 子タスクブロック（初期は折りたたみ）
@@ -694,13 +695,14 @@ function renderWH(){
           <span style="width:18px;color:#ccc;font-size:12px;">└</span>
           <div class="task-content">
             <div class="task-name" style="font-size:14px">${taskNameHtml(c)}</div>
-            <div class="task-meta">${dlTag(c.deadline)}${c.memo?`<span class="tag misc">📝 ${esc(c.memo)}</span>`:''}</div>
+            <div class="task-meta">${dlTag(c.deadline)}</div>
           </div>
           <div class="task-actions">
             ${cAlreadyToday?'<span style="font-size:11px;color:var(--teal);font-weight:700;">✓今日</span>':`<button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${c.id}')" title="今日やるに追加">☀️</button>`}
             <button class="icon-btn edit" onclick="openEditModal('${c.id}')" title="編集">✎</button>
             <button class="icon-btn danger" onclick="delTask('${c.id}')" title="削除">✕</button>
           </div>`;
+        if(c.memo)attachMemoTip(crow.querySelector('.task-content'),c.memo);
         childBlock.appendChild(crow);
       });
       // ＋子タスク追加ボタン
