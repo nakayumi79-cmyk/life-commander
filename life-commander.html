@@ -404,7 +404,7 @@ window._fsLoad = async function() {
       <input class="inp" id="whInput" placeholder="タスク名を入力してEnter..." onkeydown="if(event.key==='Enter'&&!event.isComposing)quickAdd()">
       <button class="btn btn-yellow" onclick="quickAdd()">追加</button>
     </div>
-    <div class="task-list" id="whList"></div>
+    <div class="task-list" id="whList" ondragover="onDragOver(event)" ondrop="onDropWH(event)"></div>
   </div>
 </div>
 
@@ -591,7 +591,8 @@ function renderWH(){
     const alreadyToday=t.todayDate===todayStr();
     // 親 or 単独タスク行
     const row=document.createElement('div');
-    row.className='task-item wh-parent';row.dataset.id=t.id;
+    row.className='task-item wh-parent';row.draggable=true;row.dataset.id=t.id;
+    row.addEventListener('dragstart',onDS);row.addEventListener('dragend',onDE);
     row.innerHTML=`
       <span class="wh-toggle ${hasKids?'':'wh-toggle-leaf'}" data-id="${t.id}">${hasKids?'▶':''}</span>
       <div class="task-content">
