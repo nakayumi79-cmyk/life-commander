@@ -301,6 +301,35 @@
   .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
 
   .subtask-indent{margin-left:20px;border-left:3px solid rgba(64,224,208,0.4);padding-left:6px;}
+
+  /* メモツールチップ */
+  .memo-tooltip{
+    position:fixed;z-index:2000;
+    background:#2a2420;color:#fff;
+    font-size:13px;line-height:1.6;
+    padding:10px 14px;border-radius:10px;
+    max-width:260px;white-space:pre-wrap;word-break:break-word;
+    box-shadow:0 4px 20px rgba(0,0,0,0.25);
+    pointer-events:none;opacity:0;transition:opacity 0.15s;
+  }
+  .memo-tooltip.show{opacity:1;}
+  /* PCホバー用 */
+  .has-memo{position:relative;}
+  @media(hover:hover){
+    .has-memo:hover .memo-bubble{
+      display:block;
+    }
+    .memo-bubble{
+      display:none;position:absolute;
+      bottom:calc(100% + 6px);left:0;
+      background:#2a2420;color:#fff;
+      font-size:13px;line-height:1.6;
+      padding:10px 14px;border-radius:10px;
+      max-width:280px;white-space:pre-wrap;word-break:break-word;
+      box-shadow:0 4px 20px rgba(0,0,0,0.25);
+      z-index:500;pointer-events:none;
+    }
+  }
 </style>
 <!-- Firebase SDK -->
 <script type="module">
@@ -579,6 +608,37 @@ function dlTag(dl){
   return`<span class="${cls}">${lbl}</span>`;
 }
 
+// ===== MEMO TOOLTIP =====
+const _memoTip=document.createElement('div');
+_memoTip.className='memo-tooltip';
+document.body.appendChild(_memoTip);
+let _longTapTimer=null;
+
+function attachMemoTip(el,memo){
+  if(!memo)return;
+  el.classList.add('has-memo');
+  const bubble=document.createElement('div');
+  bubble.className='memo-bubble';
+  bubble.textContent=memo;
+  el.appendChild(bubble);
+  el.addEventListener('touchstart',e=>{
+    _longTapTimer=setTimeout(()=>{
+      const touch=e.touches[0];
+      showMemoTip(memo,touch.clientX,touch.clientY);
+    },500);
+  },{passive:true});
+  el.addEventListener('touchend',()=>clearTimeout(_longTapTimer),{passive:true});
+  el.addEventListener('touchmove',()=>clearTimeout(_longTapTimer),{passive:true});
+}
+function showMemoTip(memo,x,y){
+  _memoTip.textContent=memo;
+  _memoTip.style.left=Math.min(x,window.innerWidth-280)+'px';
+  _memoTip.style.top=Math.max(y-80,10)+'px';
+  _memoTip.classList.add('show');
+  setTimeout(()=>document.addEventListener('touchstart',hideMemoTip,{once:true,passive:true}),100);
+}
+function hideMemoTip(){_memoTip.classList.remove('show');}
+
 // ===== WAREHOUSE =====
 function renderWH(){
   const list=document.getElementById('whList');
@@ -794,6 +854,7 @@ function renderCol(colId,tasks){
         ${!isDone?`<button class="icon-btn edit" onclick="openEditModal('${t.id}')" title="編集">✎</button>`:''}
         <button class="icon-btn danger" onclick="${isDone?`removeFromToday('${t.id}')`:`delTask('${t.id}')`}" title="${isDone?'戻す':'外す'}">✕</button>
       </div>`;
+    if(t.memo)attachMemoTip(div.querySelector('.task-content'),t.memo);
     el.appendChild(div);
   });
 }
@@ -858,6 +919,7 @@ function renderSchedule(){
           <button class="icon-btn edit" onclick="openSchedEdit('${t.id}')">✎</button>
           <button class="icon-btn danger" onclick="delTask('${t.id}')">✕</button>
         </div>`;
+      if(t.memo)attachMemoTip(item.querySelector('.task-content'),t.memo);
 
       // PC drag
       item.addEventListener('dragstart',e=>{
