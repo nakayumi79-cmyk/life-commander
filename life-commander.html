@@ -746,11 +746,13 @@ function renderToday(){
         </div>
         ${!hasK?`<div class="task-actions"><button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${task.id}')" title="今日やるに追加">☀️</button></div>`:''}`;
       src.appendChild(div);
+      if(task.memo)attachMemoTip(div.querySelector('.task-content'),task.memo);
       k.forEach(c=>{
         const cd=document.createElement('div');cd.className='task-item subtask-indent';
         cd.draggable=true;cd.dataset.id=c.id;
         cd.addEventListener('dragstart',onDS);cd.addEventListener('dragend',onDE);
         cd.innerHTML=`<span class="drag-handle">⠿</span><div class="task-content"><div class="task-name" style="font-size:13px">${esc(c.name)}</div><div class="task-meta">${dlTag(c.deadline)}</div></div><div class="task-actions"><button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${c.id}')" title="今日やるに追加">☀️</button></div>`;
+        if(c.memo)attachMemoTip(cd.querySelector('.task-content'),c.memo);
         src.appendChild(cd);
       });
     });
@@ -1045,6 +1047,7 @@ function renderSchedSrc(){
     },{passive:true});
 
     list.appendChild(div);
+    if(t.memo)attachMemoTip(div.querySelector('.task-content'),t.memo);
   });
 }
 
