@@ -665,7 +665,7 @@ function renderToday(){
   });
   if(changed)saveState();
   const src=document.getElementById('todaySrc');src.innerHTML='';
-  const notTd=S.tasks.filter(t=>!t.parentId&&!t.scheduledDate&&t.todayDate!==todayStr()&&!t.isRoutine);
+  const notTd=S.tasks.filter(t=>!t.parentId&&!t.scheduledDate&&t.todayDate!==todayStr()&&!t.isRoutine&&!t.directTask&&t.status!=='done');
   const schedTd=S.tasks.filter(t=>t.scheduledDate===todayStr()&&t.todayDate!==todayStr());
   const all=[...notTd,...schedTd];
   if(all.length===0){src.innerHTML='<div class="empty-state">全タスクをボードに追加済み 🎉</div>';}
