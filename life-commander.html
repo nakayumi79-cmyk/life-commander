@@ -577,7 +577,7 @@ function dlTag(dl){
 // ===== WAREHOUSE =====
 function renderWH(){
   const list=document.getElementById('whList'),tree=document.getElementById('treeView');
-  const roots=S.tasks.filter(t=>!t.parentId&&!t.scheduledDate&&!t.isRoutine&&t.status!=='done');
+  const roots=S.tasks.filter(t=>!t.parentId&&!t.scheduledDate&&!t.isRoutine&&t.status!=='done'&&!t.directTask&&(!t.todayDate||t.todayDate!==todayStr()));
   list.innerHTML='';
   if(roots.length===0){list.innerHTML='<div class="empty-state">アイデアをどんどん追加しましょう ✨<br>Enterキーでサクッと追加できます</div>';}
   else roots.forEach(t=>list.appendChild(mkTaskEl(t)));
