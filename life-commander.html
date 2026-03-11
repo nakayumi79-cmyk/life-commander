@@ -206,7 +206,17 @@
   .today-layout{display:grid;grid-template-columns:280px 1fr;gap:20px;align-items:start;}
   .today-layout>.panel{position:sticky;top:16px;}
   .today-layout>.panel .task-list{max-height:calc(100vh - 180px);overflow-y:auto;}
+  .today-right{display:flex;flex-direction:column;gap:16px;min-width:0;}
   .board-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+
+  .goal-area{background:linear-gradient(135deg,rgba(64,224,208,0.08),rgba(64,224,208,0.02));border:1.5px solid rgba(64,224,208,0.35);border-radius:12px;padding:10px 14px;display:flex;align-items:flex-start;gap:10px;}
+  .goal-label{font-size:12px;font-weight:700;color:#158878;white-space:nowrap;padding-top:3px;letter-spacing:0.05em;}
+  .goal-textarea{flex:1;border:none;background:transparent;resize:none;font-size:13px;color:var(--text);font-family:inherit;line-height:1.6;outline:none;min-height:36px;max-height:80px;overflow-y:auto;}
+  .goal-textarea::placeholder{color:var(--text3);}
+  @media(max-width:768px){
+    .goal-area{padding:8px 12px;}
+    .goal-textarea{font-size:12px;min-height:32px;max-height:60px;}
+  }
 
   .board-col{background:var(--surface);border:2px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.05);}
   .board-col-hdr{padding:13px 16px;border-bottom:2px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
@@ -224,7 +234,12 @@
   .board-col.done .col-cnt{background:var(--teal);}
   .board-col-body{padding:10px;min-height:150px;}
   .col-input-row{padding:8px 10px;border-top:2px solid var(--border);display:flex;gap:6px;}
-  @media(max-width:768px){.board-cols{grid-template-columns:1fr;}}
+  @media(max-width:768px){
+    .board-cols{grid-template-columns:1fr;}
+    .today-layout{grid-template-columns:1fr;}
+    .today-layout>.panel{position:static;}
+    .today-layout>.panel .task-list{max-height:none;}
+  }
 
   /* ===== SCHEDULE ===== */
   .sched-day{border-bottom:2px solid var(--border);}
@@ -449,6 +464,11 @@ window._fsLoad = async function() {
       </div>
       <div class="task-list" id="todaySrc" style="max-height:600px"></div>
     </div>
+    <div class="today-right">
+    <div class="goal-area">
+      <div class="goal-label">🎯 目標メモ</div>
+      <textarea id="goalText" class="goal-textarea" placeholder="今月・今週の目標、意識したいことなど..." oninput="saveGoal(this)"></textarea>
+    </div>
     <div class="board-cols">
       <div class="board-col routine">
         <div class="board-col-hdr">
@@ -479,6 +499,7 @@ window._fsLoad = async function() {
         </div>
         <div class="board-col-body" id="col-done"></div>
       </div>
+    </div>
     </div>
   </div>
 </div>
@@ -587,12 +608,13 @@ function saveState(){
 }
 
 let S=loadState();
-if(!S.tasks)S.tasks=[];if(!S.memos)S.memos={};if(!S.images)S.images={};
+if(!S.tasks)S.tasks=[];if(!S.memos)S.memos={};if(!S.images)S.images={};if(!S.goalText)S.goalText='';
 
 // Firestoreから読み込んだデータで上書き更新するコールバック
 window._onFsLoaded = function(data){
   S = data;
-  if(!S.tasks)S.tasks=[];if(!S.memos)S.memos={};if(!S.images)S.images={};
+  if(!S.tasks)S.tasks=[];if(!S.memos)S.memos={};if(!S.images)S.images={};if(!S.goalText)S.goalText='';
+  const gt=document.getElementById('goalText');if(gt)gt.value=S.goalText||'';
   renderAll();
   checkAlerts();
 };
@@ -601,6 +623,12 @@ function genId(){return Date.now()+'_'+Math.random().toString(36).slice(2,6);}
 function getT(id){return S.tasks.find(t=>t.id===id);}
 function kids(id){return S.tasks.filter(t=>t.parentId===id&&t.status!=='done');}
 function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
+
+function saveGoal(el){
+  S.goalText=el.value;
+  localStorage.setItem('lifeCmd_v5',JSON.stringify(S));
+  if(window._fsSave)window._fsSave(S);
+}
 
 function checkAlerts(){
   const tmrw=S.tasks.filter(t=>t.deadline&&t.status!=='done'&&dlDiff(t.deadline)===1);
@@ -1286,7 +1314,14 @@ function showTab(name,btn){
   else if(name==='diary'){renderCal();renderDiary();}
   else renderWH();
 }
-function renderAll(){renderWH();const a=document.querySelector('.main.active')?.id;if(a==='tab-today')renderToday();else if(a==='tab-schedule'){renderSchedule();renderSchedSrc();}else if(a==='tab-diary'){renderCal();renderDiary();}}
+function renderAll(){
+  renderWH();
+  const gt=document.getElementById('goalText');if(gt&&!gt._dirty)gt.value=S.goalText||'';
+  const a=document.querySelector('.main.active')?.id;
+  if(a==='tab-today')renderToday();
+  else if(a==='tab-schedule'){renderSchedule();renderSchedSrc();}
+  else if(a==='tab-diary'){renderCal();renderDiary();}
+}
 
 function exportData(){
   const json=JSON.stringify(S,null,2);
@@ -1324,6 +1359,7 @@ document.getElementById('smName').addEventListener('keydown',e=>{if(e.key==='Ent
 initDeadlineInput('mDl');
 initDeadlineInput('smDl');
 initDeadlineInput('smDate');
+const _gt=document.getElementById('goalText');if(_gt)_gt.value=S.goalText||'';
 checkAlerts();renderToday();
 </script>
 </body>
