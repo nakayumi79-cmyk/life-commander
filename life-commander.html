@@ -352,7 +352,7 @@
 <!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCTudggTBn_AtfnYA3BUFdwX9AXi4dyoAQ",
@@ -368,11 +368,14 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const DOC_REF = doc(db, "userdata", "main");
 
+// 自分が保存中かどうかのフラグ（自分の保存でonSnapshotが再発火するのを防ぐ）
+let _isSaving = false;
+
 // Firestore保存
 window._fsSave = async function(state) {
   try {
-    // images はサイズが大きいのでlocalStorageのみ
-    const toSave = { tasks: state.tasks, memos: state.memos };
+    _isSaving = true;
+    const toSave = { tasks: state.tasks, memos: state.memos, goalText: state.goalText||'' };
     await setDoc(DOC_REF, toSave);
     const el = document.getElementById('syncInd');
     if(el){ el.textContent='☁️ 同期済み'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2000); }
@@ -380,39 +383,32 @@ window._fsSave = async function(state) {
     const el = document.getElementById('syncInd');
     if(el){ el.textContent='⚠️ 同期失敗'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),3000); }
     console.error('Firestore save error:', e);
+  } finally {
+    setTimeout(()=>{ _isSaving = false; }, 500);
   }
 };
 
-// Firestore読み込み
-window._fsLoad = async function() {
-  try {
-    const snap = await getDoc(DOC_REF);
-    if(snap.exists()) {
-      const data = snap.data();
-      // localStorageのimagesとマージ
-      let local = {};
-      try{ local = JSON.parse(localStorage.getItem('lifeCmd_v5')||'{}'); }catch(e){}
-      const merged = { tasks: data.tasks||[], memos: data.memos||{}, images: local.images||{} };
-      // localStorageも更新
-      localStorage.setItem('lifeCmd_v5', JSON.stringify(merged));
-      return merged;
-    }
-  } catch(e) {
-    console.error('Firestore load error:', e);
-  }
-  return null;
-};
+// リアルタイムリスナー開始
+const el = document.getElementById('syncInd');
+if(el){ el.textContent='☁️ 同期中...'; el.classList.add('show'); }
 
-// ページロード時にFirestoreから読み込んで画面を更新
-(async () => {
-  const el = document.getElementById('syncInd');
-  if(el){ el.textContent='☁️ 同期中...'; el.classList.add('show'); }
-  const data = await window._fsLoad();
-  if(data && window._onFsLoaded) {
-    window._onFsLoaded(data);
+onSnapshot(DOC_REF, (snap) => {
+  if(_isSaving) return; // 自分の保存による発火は無視
+  if(snap.exists()) {
+    const data = snap.data();
+    let local = {};
+    try{ local = JSON.parse(localStorage.getItem('lifeCmd_v5')||'{}'); }catch(e){}
+    const merged = { tasks: data.tasks||[], memos: data.memos||{}, images: local.images||{}, goalText: data.goalText||'' };
+    localStorage.setItem('lifeCmd_v5', JSON.stringify(merged));
+    if(window._onFsLoaded) window._onFsLoaded(merged);
+    if(el){ el.textContent='☁️ 同期済み'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2000); }
+  } else {
+    if(el){ el.classList.remove('show'); }
   }
-  if(el){ el.textContent='☁️ 同期済み'; setTimeout(()=>el.classList.remove('show'),2000); }
-})();
+}, (e) => {
+  console.error('Firestore listen error:', e);
+  if(el){ el.textContent='⚠️ 同期失敗'; el.classList.add('show'); }
+});
 </script>
 </head>
 <body>
