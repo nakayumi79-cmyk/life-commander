@@ -368,13 +368,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const DOC_REF = doc(db, "userdata", "main");
 
-// 自分が保存中かどうかのフラグ（自分の保存でonSnapshotが再発火するのを防ぐ）
-let _isSaving = false;
-
 // Firestore保存
 window._fsSave = async function(state) {
   try {
-    _isSaving = true;
     const toSave = { tasks: state.tasks, memos: state.memos, goalText: state.goalText||'' };
     await setDoc(DOC_REF, toSave);
     const el = document.getElementById('syncInd');
@@ -383,8 +379,6 @@ window._fsSave = async function(state) {
     const el = document.getElementById('syncInd');
     if(el){ el.textContent='⚠️ 同期失敗'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),3000); }
     console.error('Firestore save error:', e);
-  } finally {
-    setTimeout(()=>{ _isSaving = false; }, 500);
   }
 };
 
@@ -393,7 +387,8 @@ const el = document.getElementById('syncInd');
 if(el){ el.textContent='☁️ 同期中...'; el.classList.add('show'); }
 
 onSnapshot(DOC_REF, (snap) => {
-  if(_isSaving) return; // 自分の保存による発火は無視
+  // hasPendingWrites=true は自分の書き込みがサーバー反映前のローカルイベント → スキップ
+  if(snap.metadata.hasPendingWrites) return;
   if(snap.exists()) {
     const data = snap.data();
     let local = {};
@@ -961,7 +956,7 @@ function renderSchedule(){
         <span class="drag-handle">⠿</span>
         <div class="task-content">
           <div class="task-name">${taskNameHtml(t)}</div>
-          <div class="task-meta">${dlTag(t.deadline)}${t.memo?`<span class="tag misc">📝 ${esc(t.memo)}</span>`:''}</div>
+          <div class="task-meta">${dlTag(t.deadline)}</div>
         </div>
         <div class="task-actions">
           <button class="icon-btn edit" onclick="openSchedEdit('${t.id}')">✎</button>
