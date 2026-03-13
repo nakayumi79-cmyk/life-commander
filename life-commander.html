@@ -40,6 +40,7 @@
     .header-right{gap:6px;flex-shrink:0;}
     .date-display{font-size:11px;white-space:nowrap;}
     .btn-header{font-size:10px;padding:4px 7px;}
+    .btn-header-exportimport{display:none;}
     .save-indicator{font-size:10px;padding:2px 6px;}
     .nav{padding:0 4px;}
     .nav-btn{padding:10px 8px;font-size:12px;}
@@ -160,7 +161,7 @@
   .input-row{padding:12px 14px;border-bottom:2px solid var(--border);display:flex;gap:8px;}
 
   /* ===== TASK LIST ===== */
-  .task-list{padding:10px;min-height:120px;max-height:520px;overflow-y:auto;}
+  .task-list{padding:10px;min-height:120px;max-height:520px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
   .task-list::-webkit-scrollbar{width:5px;}
   .task-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 
@@ -432,8 +433,8 @@ onSnapshot(DOC_REF, (snap) => {
 <div class="header">
   <h1>✨ 人生の司令塔</h1>
   <div class="header-right">
-    <button class="btn-header" onclick="exportData()" title="データをバックアップ">💾 書き出し</button>
-    <label class="btn-header" title="バックアップから復元">📂 読み込み<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+    <button class="btn-header btn-header-exportimport" onclick="exportData()" title="データをバックアップ">💾 書き出し</button>
+    <label class="btn-header btn-header-exportimport" title="バックアップから復元">📂 読み込み<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
     <span class="save-indicator" id="saveInd">保存 ✓</span>
     <span class="save-indicator" id="syncInd">☁️ 同期済み</span>
     <span class="date-display" id="headerDate"></span>
@@ -1063,8 +1064,8 @@ function toggleSD(hdr){const b=hdr.nextElementSibling;b.style.display=b.style.di
 
 function renderSchedSrc(){
   const list=document.getElementById('schedSrc');if(!list)return;
-  // 親タスク＋子タスク（scheduledDate/isRoutine/done/今日やる済み を除く）
-  const allAvail=S.tasks.filter(t=>!t.scheduledDate&&!t.isRoutine&&t.status!=='done'&&(!t.todayDate||t.todayDate!==todayStr()));
+  // 親タスク＋子タスク（scheduledDate/isRoutine/done/今日やる済み/directTask を除く）
+  const allAvail=S.tasks.filter(t=>!t.scheduledDate&&!t.isRoutine&&t.status!=='done'&&!t.directTask&&(!t.todayDate||t.todayDate!==todayStr()));
   // 表示順: 親→直後に子
   const roots=allAvail.filter(t=>!t.parentId);
   const display=[];
