@@ -174,7 +174,7 @@
     background:var(--bg);
     transition:all 0.15s;
   }
-  .task-item[draggable="true"]{cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;}
+  .task-item[draggable="true"]{cursor:grab;user-select:none;-webkit-user-select:none;}
   .drag-handle{touch-action:none;user-select:none;-webkit-user-select:none;}
   .task-item[draggable="true"]:hover{border-color:var(--yellow);background:rgba(248,181,0,0.05);box-shadow:0 2px 8px rgba(248,181,0,0.15);}
   .task-item.dragging{opacity:0.35;cursor:grabbing;}
@@ -983,9 +983,9 @@ function renderSchedule(){
     tasks.forEach(t=>{
       const item=document.createElement('div');
       item.className='task-item';item.draggable=true;item.dataset.id=t.id;
-      item.style.cssText='margin-bottom:6px;touch-action:none;user-select:none;-webkit-user-select:none;';
+      item.style.cssText='margin-bottom:6px;user-select:none;-webkit-user-select:none;';
       item.innerHTML=`
-        <span class="drag-handle">⠿</span>
+        <span class="drag-handle" style="touch-action:none;">⠿</span>
         <div class="task-content">
           <div class="task-name">${taskNameHtml(t)}</div>
           <div class="task-meta">${dlTag(t.deadline)}</div>
@@ -1081,9 +1081,9 @@ function renderSchedSrc(){
 
   display.forEach(({t,indent})=>{
     const div=document.createElement('div');div.className='task-item';div.draggable=true;div.dataset.id=t.id;
-    div.style.cssText=`touch-action:none;user-select:none;-webkit-user-select:none;${indent?'margin-left:18px;border-left:3px solid var(--yellow);':''}`;
+    div.style.cssText=`user-select:none;-webkit-user-select:none;${indent?'margin-left:18px;border-left:3px solid var(--yellow);':''}`;
     div.innerHTML=`
-      <span class="drag-handle" style="color:#b07800;font-size:16px;">⠿</span>
+      <span class="drag-handle" style="touch-action:none;color:#b07800;font-size:16px;">⠿</span>
       <div class="task-content">
         <div class="task-name">${taskNameHtml(t,{prefix:indent?'└ ':''})}</div>
         <div class="task-meta">${dlTag(t.deadline)}</div>
@@ -1310,7 +1310,7 @@ function saveTaskModal(){const name=document.getElementById('mName').value.trim(
 let smEditId=null;
 function openSchedAdd(date){smEditId=null;document.getElementById('schedModalTitle').textContent='🗓️ 予定を追加';['smName','smMemo','smUrl'].forEach(id=>document.getElementById(id).value='');document.getElementById('smDate').value=date;document.getElementById('smDl').value='';document.getElementById('schedModal').classList.add('open');document.getElementById('smName').focus();initTxa('smMemo');}
 function openSchedEdit(id){const t=getT(id);if(!t)return;smEditId=id;document.getElementById('schedModalTitle').textContent='✏️ 予定を編集';document.getElementById('smName').value=t.name;document.getElementById('smDate').value=t.scheduledDate||'';document.getElementById('smDl').value=t.deadline||'';document.getElementById('smMemo').value=t.memo||'';document.getElementById('smUrl').value=t.url||'';document.getElementById('schedModal').classList.add('open');document.getElementById('smName').focus();initTxa('smMemo');}
-function saveSchedModal(){const name=document.getElementById('smName').value.trim();if(!name)return;const date=document.getElementById('smDate').value;const deadline=document.getElementById('smDl').value||null;const memo=document.getElementById('smMemo').value.trim();const url=document.getElementById('smUrl').value.trim()||null;if(smEditId){const t=getT(smEditId);if(t){t.name=name;t.scheduledDate=date;t.deadline=deadline;t.memo=memo;t.url=url;}}else{S.tasks.push({id:genId(),name,memo,deadline,url,parentId:null,scheduledDate:date,status:'todo',todayDate:null,completedDate:null});}saveState();closeModal('schedModal');renderAll();}
+function saveSchedModal(){const name=document.getElementById('smName').value.trim();if(!name)return;const date=document.getElementById('smDate').value;const deadline=document.getElementById('smDl').value||null;const memo=document.getElementById('smMemo').value.trim();const url=document.getElementById('smUrl').value.trim()||null;if(smEditId){const t=getT(smEditId);if(t){t.name=name;t.scheduledDate=date;t.deadline=deadline;t.memo=memo;t.url=url;}}else{S.tasks.push({id:genId(),name,memo,deadline,url,parentId:null,scheduledDate:date,status:'todo',todayDate:null,completedDate:null,schedDirect:true});}saveState();closeModal('schedModal');renderAll();}
 
 function addToToday(id){const t=getT(id);if(!t)return;t.todayDate=todayStr();t.status='doing';t.completedDate=null;saveState();renderToday();}
 function quickAdd(){const inp=document.getElementById('whInput');const name=inp.value.trim();if(!name)return;S.tasks.push({id:genId(),name,memo:'',deadline:null,parentId:null,scheduledDate:null,status:'todo',todayDate:null,completedDate:null});inp.value='';saveState();renderWH();}
