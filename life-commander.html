@@ -1163,7 +1163,9 @@ function renderDiary(){
       <input type="file" accept="image/*" multiple onchange="handleImgUpload(event)">
     </label>`;
   body.innerHTML=html;
-  document.getElementById('dMemo').addEventListener('input',e=>{S.memos[selDate]=e.target.value;saveState();});
+  const dMemo=document.getElementById('dMemo');
+  dMemo.addEventListener('input',e=>{S.memos[selDate]=e.target.value;saveState();autoResize(e.target);});
+  dMemo.style.height='auto';dMemo.style.height=Math.max(90,dMemo.scrollHeight)+'px';
   const ua=document.getElementById('uploadArea');
   ua.addEventListener('dragover',e=>{e.preventDefault();ua.classList.add('over');});
   ua.addEventListener('dragleave',()=>ua.classList.remove('over'));
