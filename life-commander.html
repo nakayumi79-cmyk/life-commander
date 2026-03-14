@@ -1002,22 +1002,20 @@ function renderSchedule(){
       });
       item.addEventListener('dragend',()=>{item.classList.remove('dragging');panel.querySelectorAll('.sched-day-body').forEach(b=>b.style.background='');});
 
-      // iOS touch drag
-      let touchClone=null,touchScrollY=0;
-      item.addEventListener('touchstart',e=>{
-        schedDragId=t.id;touchScrollY=window.scrollY;
+      // iOS touch drag — ドラッグハンドルのみ
+      const handle=item.querySelector('.drag-handle');
+      handle.addEventListener('touchstart',e=>{
+        schedDragId=t.id;
         item.style.opacity='0.4';
       },{passive:true});
-      item.addEventListener('touchmove',e=>{
+      handle.addEventListener('touchmove',e=>{
         e.preventDefault();
         const touch=e.touches[0];
-        // ターゲットのbodyを探してハイライト
         panel.querySelectorAll('.sched-day-body').forEach(b=>b.style.background='');
         const el=document.elementFromPoint(touch.clientX,touch.clientY);
         const targetBody=el&&el.closest('.sched-day-body');
         if(targetBody){
           targetBody.style.background='rgba(64,224,208,0.12)';
-          // 同じ日の場合は並び替えプレビュー
           if(targetBody===body){
             const after=getDragAfterElement(body,touch.clientY);
             const btn=body.querySelector('.add-btn');
@@ -1027,7 +1025,7 @@ function renderSchedule(){
           }
         }
       },{passive:false});
-      item.addEventListener('touchend',e=>{
+      handle.addEventListener('touchend',e=>{
         item.style.opacity='';
         panel.querySelectorAll('.sched-day-body').forEach(b=>b.style.background='');
         const touch=e.changedTouches[0];
@@ -1038,7 +1036,6 @@ function renderSchedule(){
           const task=getT(schedDragId);
           if(task){
             task.scheduledDate=targetDate;
-            // DOM順で配列を並び替え
             const ids=[...targetBody.querySelectorAll('.task-item[data-id]')].map(el=>el.dataset.id);
             ids.forEach(id=>{const tt=getT(id);if(tt)tt.scheduledDate=targetDate;});
             const others=S.tasks.filter(tt=>!ids.includes(tt.id));
