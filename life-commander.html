@@ -374,7 +374,7 @@
 <!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCTudggTBn_AtfnYA3BUFdwX9AXi4dyoAQ",
@@ -393,8 +393,18 @@ const DOC_REF = doc(db, "userdata", "main");
 // Firestore保存
 window._fsSave = async function(state) {
   try {
-    const toSave = { tasks: state.tasks, memos: state.memos, goalText: state.goalText||'' };
+    const toSave = { tasks: state.tasks, memos: state.memos, goalText: state.goalText||'', trash: state.trash||[] };
     await setDoc(DOC_REF, toSave);
+    // バックアップ世代管理（3世代）
+    const backupRef = doc(db, "userdata", "backups");
+    let backups = [];
+    try {
+      const bsnap = await getDoc(backupRef);
+      backups = bsnap.exists() ? (bsnap.data().list||[]) : [];
+    } catch(e){}
+    backups.unshift({ savedAt: Date.now(), tasks: state.tasks, memos: state.memos, goalText: state.goalText||'' });
+    if(backups.length>3) backups=backups.slice(0,3);
+    await setDoc(backupRef, { list: backups });
     const el = document.getElementById('syncInd');
     if(el){ el.textContent='☁️ 同期済み'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2000); }
   } catch(e) {
@@ -438,6 +448,7 @@ onSnapshot(DOC_REF, (snap) => {
     <span class="save-indicator" id="saveInd">保存 ✓</span>
     <span class="save-indicator" id="syncInd">☁️ 同期済み</span>
     <span class="date-display" id="headerDate"></span>
+    <button class="btn-header" onclick="openTrash()" title="ゴミ箱" id="trashBtn">🗑️</button>
     <button class="btn-header" onclick="toggleSearch()" title="検索" id="searchBtn">🔍</button>
   </div>
 </div>
@@ -607,6 +618,17 @@ onSnapshot(DOC_REF, (snap) => {
   <img id="lbImg" src="" alt="" onclick="event.stopPropagation()">
 </div>
 
+<!-- ゴミ箱モーダル -->
+<div class="modal-overlay" id="trashModal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <span class="modal-title">🗑️ ゴミ箱（7日間保持）</span>
+      <button class="modal-close" onclick="closeModal('trashModal')">×</button>
+    </div>
+    <div id="trashList" style="max-height:60vh;overflow-y:auto;padding:8px 0;"></div>
+  </div>
+</div>
+
 <script>
 // 3時基準で「今日」を判定
 const _now=new Date();
@@ -621,21 +643,23 @@ function jpDate(s){if(!s)return'';const d=new Date(s+'T00:00:00');return d.getFu
 function dayLabel(s){const d=new Date(s+'T00:00:00');const diff=Math.round((new Date(s+'T00:00:00')-TODAY)/86400000);const base=(d.getMonth()+1)+'/'+d.getDate()+'（'+DAYS[d.getDay()]+'）';if(diff===0)return'今日 '+base;if(diff===1)return'明日 '+base;return base;}
 function dlDiff(s){if(!s)return null;return Math.round((new Date(s+'T00:00:00')-TODAY)/86400000);}
 
-function loadState(){try{const r=localStorage.getItem('lifeCmd_v5');if(r)return JSON.parse(r);}catch(e){}return{tasks:[],memos:{},images:{}};}
+function loadState(){try{const r=localStorage.getItem('lifeCmd_v5');if(r)return JSON.parse(r);}catch(e){}return{tasks:[],memos:{},images:{},trash:[]};}
 function saveState(){
+  // ゴミ箱の7日以上前のタスクを自動クリア
+  const cutoff=Date.now()-7*24*60*60*1000;
+  if(S.trash)S.trash=S.trash.filter(t=>t._deletedAt&&t._deletedAt>cutoff);
   localStorage.setItem('lifeCmd_v5',JSON.stringify(S));
   const el=document.getElementById('saveInd');el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1500);
-  // Firestoreにも非同期保存
   if(window._fsSave) window._fsSave(S);
 }
 
 let S=loadState();
-if(!S.tasks)S.tasks=[];if(!S.memos)S.memos={};if(!S.images)S.images={};if(!S.goalText)S.goalText='';
+if(!S.tasks)S.tasks=[];if(!S.memos)S.memos={};if(!S.images)S.images={};if(!S.goalText)S.goalText='';if(!S.trash)S.trash=[];
 
 // Firestoreから読み込んだデータで上書き更新するコールバック
 window._onFsLoaded = function(data){
   S = data;
-  if(!S.tasks)S.tasks=[];if(!S.memos)S.memos={};if(!S.images)S.images={};if(!S.goalText)S.goalText='';
+  if(!S.tasks)S.tasks=[];if(!S.memos)S.memos={};if(!S.images)S.images={};if(!S.goalText)S.goalText='';if(!S.trash)S.trash=[];
   const gt=document.getElementById('goalText');if(gt)gt.value=S.goalText||'';
   renderAll();
   checkAlerts();
@@ -807,7 +831,33 @@ function renderToday(){
       const k=kids(task.id).filter(c=>c.todayDate!==todayStr());
       const hasK=k.length>0;
       const div=document.createElement('div');div.className='task-item';
-      if(!hasK){div.draggable=true;div.dataset.id=task.id;div.addEventListener('dragstart',onDS);div.addEventListener('dragend',onDE);}
+      if(!hasK){
+        div.draggable=true;div.dataset.id=task.id;
+        div.addEventListener('dragstart',onDS);div.addEventListener('dragend',onDE);
+        // iOS touch drag — ハンドルのみ
+        const addTodayTouch=(el,id)=>{
+          const h=el.querySelector('.drag-handle');
+          h.addEventListener('touchstart',e=>{dragId=id;dragSrcList=null;el.style.opacity='0.4';},{passive:true});
+          h.addEventListener('touchmove',e=>{
+            e.preventDefault();
+            const touch=e.touches[0];
+            const target=document.elementFromPoint(touch.clientX,touch.clientY);
+            const col=target&&target.closest('#col-doing');
+            if(col){col.style.outline='2px dashed var(--yellow)';}
+            else{document.querySelectorAll('#col-doing').forEach(c=>c.style.outline='');}
+          },{passive:false});
+          h.addEventListener('touchend',e=>{
+            el.style.opacity='';
+            document.getElementById('col-doing').style.outline='';
+            const touch=e.changedTouches[0];
+            const target=document.elementFromPoint(touch.clientX,touch.clientY);
+            const col=target&&target.closest('#col-doing,.drop-zone');
+            if(col){addToToday(id);}
+            dragId=null;
+          },{passive:true});
+        };
+        addTodayTouch(div,task.id);
+      }
       else{div.style.opacity='0.6';div.style.cursor='default';}
       if(task.scheduledDate)div.style.borderLeft='4px solid var(--yellow)';
       div.innerHTML=`
@@ -825,6 +875,26 @@ function renderToday(){
         cd.addEventListener('dragstart',onDS);cd.addEventListener('dragend',onDE);
         cd.innerHTML=`<span class="drag-handle">⠿</span><div class="task-content"><div class="task-name" style="font-size:13px">${taskNameHtml(c)}</div><div class="task-meta">${dlTag(c.deadline)}</div></div><div class="task-actions"><button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${c.id}')" title="今日やるに追加">☀️</button></div>`;
         if(c.memo)attachMemoTip(cd.querySelector('.task-content'),c.memo);
+        // iOS touch drag
+        const hc=cd.querySelector('.drag-handle');
+        hc.addEventListener('touchstart',e=>{dragId=c.id;cd.style.opacity='0.4';},{passive:true});
+        hc.addEventListener('touchmove',e=>{
+          e.preventDefault();
+          const touch=e.touches[0];
+          const target=document.elementFromPoint(touch.clientX,touch.clientY);
+          const col=target&&target.closest('#col-doing');
+          if(col)col.style.outline='2px dashed var(--yellow)';
+          else document.getElementById('col-doing').style.outline='';
+        },{passive:false});
+        hc.addEventListener('touchend',e=>{
+          cd.style.opacity='';
+          document.getElementById('col-doing').style.outline='';
+          const touch=e.changedTouches[0];
+          const target=document.elementFromPoint(touch.clientX,touch.clientY);
+          const col=target&&target.closest('#col-doing,.drop-zone');
+          if(col)addToToday(c.id);
+          dragId=null;
+        },{passive:true});
         src.appendChild(cd);
       });
     });
@@ -1320,13 +1390,56 @@ function delTask(id){
     t.todayDate=null;t.status='todo';t.completedDate=null;
     saveState();renderToday();
   } else {
-    if(!confirm('削除しますか？'))return;
+    if(!confirm('削除してゴミ箱へ移動しますか？（7日間復元可能）'))return;
+    // 子タスクも含めてゴミ箱へ
+    const toTrash=S.tasks.filter(x=>x.id===id||x.parentId===id);
+    toTrash.forEach(x=>{ x._deletedAt=Date.now(); S.trash.push(x); });
     S.tasks=S.tasks.filter(x=>x.id!==id&&x.parentId!==id);
     saveState();renderAll();
   }
 }
 
-// ===== TABS =====
+// ===== TRASH =====
+function openTrash(){
+  const list=document.getElementById('trashList');
+  if(!S.trash||S.trash.length===0){
+    list.innerHTML='<div class="empty-state" style="padding:24px">ゴミ箱は空です 🌸</div>';
+  } else {
+    list.innerHTML='';
+    // 削除日時が新しい順
+    const sorted=[...S.trash].sort((a,b)=>(b._deletedAt||0)-(a._deletedAt||0));
+    sorted.forEach(t=>{
+      const daysAgo=Math.floor((Date.now()-(t._deletedAt||0))/(1000*60*60*24));
+      const daysLabel=daysAgo===0?'今日':(daysAgo+'日前');
+      const d=document.createElement('div');
+      d.className='task-item';d.style.marginBottom='6px';
+      d.innerHTML=`
+        <div class="task-content" style="flex:1;">
+          <div class="task-name">${esc(t.name)}</div>
+          <div class="task-meta" style="font-size:12px;color:var(--text3);">
+            ${daysLabel}削除
+            ${t.deadline?`　📅 ${t.deadline}`:''}
+            ${t.memo?`　📝 ${esc(t.memo.slice(0,30))}${t.memo.length>30?'…':''}`:''}
+          </div>
+        </div>
+        <button class="btn btn-sm" style="background:var(--teal);color:#fff;border:none;white-space:nowrap;" onclick="restoreFromTrash('${t.id}')">復元</button>`;
+      list.appendChild(d);
+    });
+  }
+  document.getElementById('trashModal').classList.add('open');
+}
+function restoreFromTrash(id){
+  const idx=S.trash.findIndex(t=>t.id===id);if(idx===-1)return;
+  const t=S.trash[idx];
+  delete t._deletedAt;
+  t.scheduledDate=null;t.todayDate=null;t.status='todo';
+  S.tasks.push(t);
+  S.trash.splice(idx,1);
+  saveState();renderAll();
+  openTrash();// 表示更新
+}
+
+
 function showTab(name,btn){
   document.querySelectorAll('.main').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(el=>el.classList.remove('active'));
