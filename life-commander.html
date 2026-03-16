@@ -845,31 +845,7 @@ function renderToday(){
         </div>
         ${!hasK?`<div class="task-actions"><button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${task.id}')" title="今日やるに追加">☀️</button></div>`:''}`;
       src.appendChild(div);
-      // iOS touch drag — innerHTML設定後にハンドルを取得
-      if(!hasK){
-        const h=div.querySelector('.drag-handle');
-        if(h){
-          h.style.touchAction='none';
-          h.addEventListener('touchstart',e=>{dragId=task.id;dragSrcList=null;div.style.opacity='0.4';},{passive:true});
-          h.addEventListener('touchmove',e=>{
-            e.preventDefault();
-            const touch=e.touches[0];
-            const target=document.elementFromPoint(touch.clientX,touch.clientY);
-            const col=target&&target.closest('#col-doing');
-            if(col){col.style.outline='2px dashed var(--yellow)';}
-            else{document.querySelectorAll('#col-doing').forEach(c=>c.style.outline='');}
-          },{passive:false});
-          h.addEventListener('touchend',e=>{
-            div.style.opacity='';
-            document.getElementById('col-doing').style.outline='';
-            const touch=e.changedTouches[0];
-            const target=document.elementFromPoint(touch.clientX,touch.clientY);
-            const col=target&&target.closest('#col-doing,.drop-zone');
-            if(col){addToToday(task.id);}
-            dragId=null;
-          },{passive:true});
-        }
-      }
+
       if(task.memo)attachMemoTip(div.querySelector('.task-content'),task.memo);
       k.forEach(c=>{
         const cd=document.createElement('div');cd.className='task-item subtask-indent';
@@ -877,26 +853,7 @@ function renderToday(){
         cd.addEventListener('dragstart',onDS);cd.addEventListener('dragend',onDE);
         cd.innerHTML=`<span class="drag-handle">⠿</span><div class="task-content"><div class="task-name" style="font-size:13px">${taskNameHtml(c)}</div><div class="task-meta">${dlTag(c.deadline)}</div></div><div class="task-actions"><button class="icon-btn" style="background:rgba(248,181,0,0.15);color:#b07800;border-color:rgba(248,181,0,0.4);" onclick="addToToday('${c.id}')" title="今日やるに追加">☀️</button></div>`;
         if(c.memo)attachMemoTip(cd.querySelector('.task-content'),c.memo);
-        // iOS touch drag
-        const hc=cd.querySelector('.drag-handle');
-        hc.addEventListener('touchstart',e=>{dragId=c.id;cd.style.opacity='0.4';},{passive:true});
-        hc.addEventListener('touchmove',e=>{
-          e.preventDefault();
-          const touch=e.touches[0];
-          const target=document.elementFromPoint(touch.clientX,touch.clientY);
-          const col=target&&target.closest('#col-doing');
-          if(col)col.style.outline='2px dashed var(--yellow)';
-          else document.getElementById('col-doing').style.outline='';
-        },{passive:false});
-        hc.addEventListener('touchend',e=>{
-          cd.style.opacity='';
-          document.getElementById('col-doing').style.outline='';
-          const touch=e.changedTouches[0];
-          const target=document.elementFromPoint(touch.clientX,touch.clientY);
-          const col=target&&target.closest('#col-doing,.drop-zone');
-          if(col)addToToday(c.id);
-          dragId=null;
-        },{passive:true});
+
         src.appendChild(cd);
       });
     });
