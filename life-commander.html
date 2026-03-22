@@ -1351,10 +1351,10 @@ function delTask(id){
     saveState();renderSchedule();renderSchedSrc();
   } else if(t.todayDate){
     t.todayDate=null;t.status='todo';t.completedDate=null;
+    if(t.directTask)t.directTask=false; // 倉庫タスクに変換（持ち越しループ防止）
     saveState();renderToday();
   } else {
     if(!confirm('削除してゴミ箱へ移動しますか？（7日間復元可能）'))return;
-    // 子タスクも含めてゴミ箱へ
     const toTrash=S.tasks.filter(x=>x.id===id||x.parentId===id);
     toTrash.forEach(x=>{ x._deletedAt=Date.now(); S.trash.push(x); });
     S.tasks=S.tasks.filter(x=>x.id!==id&&x.parentId!==id);
