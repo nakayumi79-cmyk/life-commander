@@ -818,9 +818,9 @@ function renderToday(){
       t.todayDate=todayStr();t.status='doing';t.scheduledDate=null;changed=true;
     }
   });
-  // directTaskは日付をまたいでも今日やるに持ち越す
+  // directTaskは日付をまたいでも今日やるに持ち越す（todayDate:nullも対象）
   S.tasks.forEach(t=>{
-    if(t.directTask&&t.status!=='done'&&t.todayDate&&t.todayDate!==todayStr()){
+    if(t.directTask&&t.status!=='done'&&t.todayDate!==todayStr()){
       t.todayDate=todayStr();changed=true;
     }
   });
@@ -968,7 +968,7 @@ function renderCol(colId,tasks){
 }
 
 function toggleDone(id){const t=getT(id);if(!t)return;if(t.status==='done'){t.status='doing';t.completedDate=null;}else{t.status='done';t.completedDate=todayStr();}saveState();renderToday();}
-function removeFromToday(id){const t=getT(id);if(!t)return;t.todayDate=null;t.status='todo';t.completedDate=null;saveState();renderToday();}
+function removeFromToday(id){const t=getT(id);if(!t)return;t.todayDate=null;t.status='todo';saveState();renderToday();}
 
 // ===== SCHEDULE =====
 let schedDragId=null;
