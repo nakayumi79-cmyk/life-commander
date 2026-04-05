@@ -421,9 +421,32 @@ window._fsSave = async function(state) {
     backups.unshift({ savedAt: Date.now(), tasks: state.tasks, memos: state.memos, goalText: state.goalText||'' });
     if(backups.length>3) backups=backups.slice(0,3);
     await setDoc(backupRef, { list: backups });
+// Firestoreエラー状態管理
+let _fsErrorMode = false;
+let _fsErrorTimer = null;
+
+window._fsSave = async function(state) {
+  try {
+    const toSave = { tasks: state.tasks, memos: state.memos, goalText: state.goalText||'', trash: state.trash||[] };
+    await setDoc(DOC_REF, toSave);
+    // バックアップ
+    const backupRef = doc(db, "userdata", "backups");
+    let backups = [];
+    try {
+      const bsnap = await getDoc(backupRef);
+      backups = bsnap.exists() ? (bsnap.data().list||[]) : [];
+    } catch(e){}
+    backups.unshift({ savedAt: Date.now(), tasks: state.tasks, memos: state.memos, goalText: state.goalText||'' });
+    if(backups.length>3) backups=backups.slice(0,3);
+    await setDoc(backupRef, { list: backups });
+    _fsErrorMode = false; // 成功したらエラーモード解除
     const el = document.getElementById('syncInd');
     if(el){ el.textContent='☁️ 同期済み'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2000); }
   } catch(e) {
+    _fsErrorMode = true; // エラーモードに入る
+    // エラーモードは60秒後に自動解除して再試行
+    if(_fsErrorTimer) clearTimeout(_fsErrorTimer);
+    _fsErrorTimer = setTimeout(()=>{ _fsErrorMode=false; }, 60000);
     const el = document.getElementById('syncInd');
     if(el){ el.textContent='⚠️ 同期失敗'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),3000); }
     console.error('Firestore save error:', e);
@@ -437,6 +460,8 @@ if(el){ el.textContent='☁️ 同期中...'; el.classList.add('show'); }
 onSnapshot(DOC_REF, (snap) => {
   // hasPendingWrites=true は自分の書き込みがサーバー反映前のローカルイベント → スキップ
   if(snap.metadata.hasPendingWrites) return;
+  // Firestoreエラーモード中はonSnapshotをスキップ（古いデータで上書きしない）
+  if(_fsErrorMode) return;
   if(snap.exists()) {
     const data = snap.data();
     let local = {};
@@ -449,6 +474,7 @@ onSnapshot(DOC_REF, (snap) => {
     if(el){ el.classList.remove('show'); }
   }
 }, (e) => {
+  _fsErrorMode = true;
   console.error('Firestore listen error:', e);
   if(el){ el.textContent='⚠️ 同期失敗'; el.classList.add('show'); }
 });
