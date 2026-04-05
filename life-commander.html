@@ -406,21 +406,6 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const DOC_REF = doc(db, "userdata", "main");
 
-// Firestore保存
-window._fsSave = async function(state) {
-  try {
-    const toSave = { tasks: state.tasks, memos: state.memos, goalText: state.goalText||'', trash: state.trash||[] };
-    await setDoc(DOC_REF, toSave);
-    // バックアップ世代管理（3世代）
-    const backupRef = doc(db, "userdata", "backups");
-    let backups = [];
-    try {
-      const bsnap = await getDoc(backupRef);
-      backups = bsnap.exists() ? (bsnap.data().list||[]) : [];
-    } catch(e){}
-    backups.unshift({ savedAt: Date.now(), tasks: state.tasks, memos: state.memos, goalText: state.goalText||'' });
-    if(backups.length>3) backups=backups.slice(0,3);
-    await setDoc(backupRef, { list: backups });
 // Firestoreエラー状態管理
 let _fsErrorMode = false;
 let _fsErrorTimer = null;
