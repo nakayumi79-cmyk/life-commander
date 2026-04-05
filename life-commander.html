@@ -960,25 +960,9 @@ function renderCol(colId,tasks){
     if(!isDone){
       div.draggable=true;div.dataset.id=t.id;
       div.addEventListener('dragstart',onDS);div.addEventListener('dragend',onDE);
-      // iOS touch drag for reorder within col
-      div.addEventListener('touchstart',e=>{dragId=t.id;dragSrcList=el;div.classList.add('dragging');},{passive:true});
-      div.addEventListener('touchmove',e=>{
-        e.preventDefault();
-        const touch=e.touches[0];
-        const after=getDragAfterElement(el,touch.clientY);
-        if(after)el.insertBefore(div,after);else el.appendChild(div);
-      },{passive:false});
-      div.addEventListener('touchend',e=>{
-        div.classList.remove('dragging');
-        // persist new order
-        const newOrder=[...el.querySelectorAll('.task-item[data-id]')].map(x=>x.dataset.id);
-        const colTasks=newOrder.map(id=>getT(id)).filter(Boolean);
-        const others=S.tasks.filter(x=>!newOrder.includes(x.id));
-        S.tasks=[...others,...colTasks];
-        saveState();dragId=null;
-      },{passive:true});
     }
     div.innerHTML=`
+      ${!isDone?`<span class="drag-handle" style="color:var(--text3);font-size:14px;cursor:grab;">⠿</span>`:'<span style="width:16px;display:inline-block;"></span>'}
       <div class="check-circle ${isDone?'on':''}" onclick="toggleDone('${t.id}')"></div>
       <div class="task-content">
         <div class="task-name">${taskNameHtml(t)}</div>
@@ -990,6 +974,28 @@ function renderCol(colId,tasks){
       </div>`;
     if(t.memo)attachMemoTip(div.querySelector('.task-content'),t.memo);
     el.appendChild(div);
+    // iOS touch drag — ハンドルのみ（ボタンのタップを妨げないため）
+    if(!isDone){
+      const handle=div.querySelector('.drag-handle');
+      if(handle){
+        handle.style.touchAction='none';
+        handle.addEventListener('touchstart',e=>{dragId=t.id;dragSrcList=el;div.classList.add('dragging');},{passive:true});
+        handle.addEventListener('touchmove',e=>{
+          e.preventDefault();
+          const touch=e.touches[0];
+          const after=getDragAfterElement(el,touch.clientY);
+          if(after)el.insertBefore(div,after);else el.appendChild(div);
+        },{passive:false});
+        handle.addEventListener('touchend',e=>{
+          div.classList.remove('dragging');
+          const newOrder=[...el.querySelectorAll('.task-item[data-id]')].map(x=>x.dataset.id);
+          const colTasks=newOrder.map(id=>getT(id)).filter(Boolean);
+          const others=S.tasks.filter(x=>!newOrder.includes(x.id));
+          S.tasks=[...others,...colTasks];
+          saveState();dragId=null;
+        },{passive:true});
+      }
+    }
   });
 }
 
@@ -1140,9 +1146,12 @@ function renderSchedSrc(){
     div.style.cssText=`user-select:none;-webkit-user-select:none;${indent?'margin-left:18px;border-left:3px solid var(--yellow);':''}`;
     div.innerHTML=`
       <span class="drag-handle" style="touch-action:none;color:#b07800;font-size:16px;">⠿</span>
-      <div class="task-content">
+      <div class="task-content" style="cursor:pointer;">
         <div class="task-name">${taskNameHtml(t,{prefix:indent?'└ ':''})}</div>
         <div class="task-meta">${dlTag(t.deadline,t.startDate)}</div>
+      </div>
+      <div class="task-actions">
+        <button class="icon-btn" style="background:rgba(64,224,208,0.15);color:#158878;border-color:rgba(64,224,208,0.4);font-size:11px;padding:3px 6px;" onclick="openSchedDatePicker('${t.id}')" title="日付を選んで追加">🗓️</button>
       </div>`;
 
     // PC drag
@@ -1178,6 +1187,42 @@ function renderSchedSrc(){
     list.appendChild(div);
     if(t.memo)attachMemoTip(div.querySelector('.task-content'),t.memo);
   });
+}
+
+function openSchedDatePicker(id){
+  // 明日〜7日後の日付リストを生成
+  const dates=[];
+  for(let i=1;i<=7;i++){
+    const d=new Date(TODAY);d.setDate(d.getDate()+i);
+    dates.push(toStr(d));
+  }
+  // 既存ポップアップがあれば削除
+  const existing=document.getElementById('schedDatePicker');
+  if(existing){existing.remove();if(existing.dataset.taskId===id)return;}
+  // ポップアップ作成
+  const pop=document.createElement('div');
+  pop.id='schedDatePicker';
+  pop.dataset.taskId=id;
+  pop.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border:2px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.18);z-index:500;padding:16px;min-width:220px;';
+  const t=getT(id);
+  pop.innerHTML=`
+    <div style="font-size:14px;font-weight:700;color:var(--text2);margin-bottom:12px;">📅 ${esc(t?t.name.slice(0,20):'')}<br><span style="font-weight:400;font-size:12px;">どの日に追加しますか？</span></div>
+    ${dates.map(d=>`<button onclick="setSchedDateFromPicker('${id}','${d}')" style="display:block;width:100%;text-align:left;padding:9px 12px;margin-bottom:4px;border:1.5px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-family:var(--font);font-size:14px;">${dayLabel(d)}</button>`).join('')}
+    <button onclick="document.getElementById('schedDatePicker').remove()" style="display:block;width:100%;text-align:center;padding:8px;margin-top:6px;border:none;border-radius:8px;background:var(--surface2);cursor:pointer;font-family:var(--font);font-size:13px;color:var(--text3);">キャンセル</button>`;
+  // オーバーレイ
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;z-index:499;background:rgba(0,0,0,0.3);';
+  overlay.onclick=()=>{pop.remove();overlay.remove();};
+  overlay.id='schedDatePickerOverlay';
+  document.body.appendChild(overlay);
+  document.body.appendChild(pop);
+}
+
+function setSchedDateFromPicker(id,date){
+  const t=getT(id);
+  if(t){t.scheduledDate=date;saveState();renderSchedule();renderSchedSrc();}
+  const pop=document.getElementById('schedDatePicker');if(pop)pop.remove();
+  const overlay=document.getElementById('schedDatePickerOverlay');if(overlay)overlay.remove();
 }
 
 // ===== DIARY =====
