@@ -1232,8 +1232,9 @@ function openSchedDatePicker(id){
   const t=getT(id);
   pop.innerHTML=`
     <div style="font-size:14px;font-weight:700;color:var(--text2);margin-bottom:12px;">📅 ${esc(t?t.name.slice(0,20):'')}<br><span style="font-weight:400;font-size:12px;">どの日に追加しますか？</span></div>
+    <button onclick="addToTodayFromPicker('${id}')" style="display:block;width:100%;text-align:left;padding:9px 12px;margin-bottom:4px;border:1.5px solid rgba(248,181,0,0.6);border-radius:8px;background:rgba(248,181,0,0.08);cursor:pointer;font-family:var(--font);font-size:14px;font-weight:700;color:#b07800;">☀️ 今日やる</button>
     ${dates.map(d=>`<button onclick="setSchedDateFromPicker('${id}','${d}')" style="display:block;width:100%;text-align:left;padding:9px 12px;margin-bottom:4px;border:1.5px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-family:var(--font);font-size:14px;">${dayLabel(d)}</button>`).join('')}
-    <button onclick="document.getElementById('schedDatePicker').remove()" style="display:block;width:100%;text-align:center;padding:8px;margin-top:6px;border:none;border-radius:8px;background:var(--surface2);cursor:pointer;font-family:var(--font);font-size:13px;color:var(--text3);">キャンセル</button>`;
+    <button onclick="document.getElementById('schedDatePicker').remove();document.getElementById('schedDatePickerOverlay')?.remove();" style="display:block;width:100%;text-align:center;padding:8px;margin-top:6px;border:none;border-radius:8px;background:var(--surface2);cursor:pointer;font-family:var(--font);font-size:13px;color:var(--text3);">キャンセル</button>`;
   // オーバーレイ
   const overlay=document.createElement('div');
   overlay.style.cssText='position:fixed;inset:0;z-index:499;background:rgba(0,0,0,0.3);';
@@ -1241,6 +1242,13 @@ function openSchedDatePicker(id){
   overlay.id='schedDatePickerOverlay';
   document.body.appendChild(overlay);
   document.body.appendChild(pop);
+}
+
+function addToTodayFromPicker(id){
+  const t=getT(id);
+  if(t){t.todayDate=todayStr();t.status='doing';t.completedDate=null;saveState();renderToday();}
+  const pop=document.getElementById('schedDatePicker');if(pop)pop.remove();
+  const overlay=document.getElementById('schedDatePickerOverlay');if(overlay)overlay.remove();
 }
 
 function setSchedDateFromPicker(id,date){
