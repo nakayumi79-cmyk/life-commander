@@ -1451,19 +1451,65 @@ function quickAdd(){const inp=document.getElementById('whInput');const name=inp.
 function delTask(id){
   const t=getT(id);if(!t)return;
   if(t.scheduledDate){
-    t.scheduledDate=null;t.status='todo';
-    saveState();renderSchedule();renderSchedSrc();
+    // 先の予定から → 2択
+    openDelPicker(id,'sched');
   } else if(t.todayDate){
-    t.todayDate=null;t.status='todo';t.completedDate=null;
-    if(t.directTask)t.directTask=false; // 倉庫タスクに変換（持ち越しループ防止）
-    saveState();renderToday();
+    // 今日やるから → 2択
+    openDelPicker(id,'today');
   } else {
+    // 倉庫から → 確認してゴミ箱
     if(!confirm('削除してゴミ箱へ移動しますか？（7日間復元可能）'))return;
-    const toTrash=S.tasks.filter(x=>x.id===id||x.parentId===id);
-    toTrash.forEach(x=>{ x._deletedAt=Date.now(); S.trash.push(x); });
-    S.tasks=S.tasks.filter(x=>x.id!==id&&x.parentId!==id);
-    saveState();renderAll();
+    trashTask(id);
   }
+}
+
+function trashTask(id){
+  const toTrash=S.tasks.filter(x=>x.id===id||x.parentId===id);
+  toTrash.forEach(x=>{ x._deletedAt=Date.now(); S.trash.push(x); });
+  S.tasks=S.tasks.filter(x=>x.id!==id&&x.parentId!==id);
+  saveState();renderAll();
+}
+
+function openDelPicker(id,from){
+  const existing=document.getElementById('delPicker');
+  if(existing){existing.remove();document.getElementById('delPickerOverlay')?.remove();}
+  const t=getT(id);if(!t)return;
+  const pop=document.createElement('div');
+  pop.id='delPicker';
+  pop.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border:2px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.18);z-index:500;padding:16px;min-width:220px;';
+  pop.innerHTML=`
+    <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:12px;">「${esc(t.name.slice(0,20))}」をどうしますか？</div>
+    <button onclick="delPickerReturn('${id}','${from}')" style="display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;border:1.5px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-family:var(--font);font-size:14px;">📦 倉庫に戻す</button>
+    <button onclick="delPickerTrash('${id}')" style="display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;border:1.5px solid rgba(224,80,80,0.4);border-radius:8px;background:rgba(224,80,80,0.05);cursor:pointer;font-family:var(--font);font-size:14px;color:var(--danger);">🗑️ ゴミ箱へ（7日間復元可）</button>
+    <button onclick="document.getElementById('delPicker').remove();document.getElementById('delPickerOverlay')?.remove();" style="display:block;width:100%;text-align:center;padding:8px;border:none;border-radius:8px;background:var(--surface2);cursor:pointer;font-family:var(--font);font-size:13px;color:var(--text3);">キャンセル</button>`;
+  const overlay=document.createElement('div');
+  overlay.id='delPickerOverlay';
+  overlay.style.cssText='position:fixed;inset:0;z-index:499;background:rgba(0,0,0,0.3);';
+  overlay.onclick=()=>{pop.remove();overlay.remove();};
+  document.body.appendChild(overlay);
+  document.body.appendChild(pop);
+}
+
+function delPickerReturn(id,from){
+  const t=getT(id);
+  if(t){
+    if(from==='sched'){
+      t.scheduledDate=null;t.status='todo';
+      saveState();renderSchedule();renderSchedSrc();
+    } else {
+      t.todayDate=null;t.status='todo';t.completedDate=null;
+      if(t.directTask)t.directTask=false;
+      saveState();renderToday();
+    }
+  }
+  document.getElementById('delPicker')?.remove();
+  document.getElementById('delPickerOverlay')?.remove();
+}
+
+function delPickerTrash(id){
+  document.getElementById('delPicker')?.remove();
+  document.getElementById('delPickerOverlay')?.remove();
+  trashTask(id);
 }
 
 // ===== TRASH =====
